@@ -1,0 +1,112 @@
+# Pool Heating Controller — Mushroom-style Lovelace card.
+# Requires HACS frontend cards you already use: Mushroom, mini-graph-card,
+# stack-in-card. Adjust entity ids if your device isn't named "Pool heating"
+# (-> sensor.pool_heating_*) or your sensors differ.
+#   pool water  : sensor.teplomer_bazen_temperature
+#   heat pump   : switch.sonoff_10013cc5bd
+#   outdoor     : sensor.pracovna_teplota
+#   night state : sensor.night_state  (optional graph shading)
+
+type: custom:stack-in-card
+cards:
+  - type: custom:mushroom-template-card
+    primary: Tepelné čerpadlo bazéna
+    secondary: "{{ state_attr('sensor.pool_heating_status', 'reason') }}"
+    multiline_secondary: true
+    icon: mdi:pool
+    icon_color: >-
+      {{ {'heating':'red','frost_protect':'red','target_reached':'green',
+          'idle_band':'green','waiting_rain':'blue','waiting_cold':'blue',
+          'waiting_cold_now':'blue','waiting_better_window':'blue',
+          'no_window':'blue','waiting_price':'amber','night_off':'grey',
+          'mode_off':'grey','waiting_filtration':'grey',
+          'compressor_protect':'grey','manual_override':'purple',
+          'sensor_unavailable':'red','forecast_unavailable':'orange'
+         }.get(states('sensor.pool_heating_status'), 'grey') }}
+    tap_action:
+      action: more-info
+      entity: sensor.pool_heating_status
+
+  - type: custom:mushroom-chips-card
+    alignment: center
+    chips:
+      - type: template
+        icon: mdi:bullseye-arrow
+        content: >-
+          {% set r = state_attr('sensor.pool_heating_status', 'predicted_ready') %}
+          {{ as_timestamp(r) | timestamp_custom('%a %H:%M') if r else '—' }}
+      - type: template
+        icon: mdi:flash
+        content: "{{ states('sensor.pool_heating_power') }} W"
+      - type: template
+        icon: mdi:lightning-bolt-circle
+        content: "{{ states('sensor.pool_heating_energy_consumed') }} kWh"
+      - type: entity
+        entity: binary_sensor.pool_heating_should_heat
+        icon: mdi:radiator
+        use_entity_picture: false
+
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.teplomer_bazen_temperature
+        name: Teplota vody
+        icon_color: green
+      - type: custom:mushroom-entity-card
+        entity: sensor.pracovna_teplota
+        name: Vonku
+        icon_color: orange
+      - type: custom:mushroom-entity-card
+        entity: sensor.pool_heating_predicted_ready
+        name: Dohriatie
+        icon: mdi:calendar-clock
+        icon_color: teal
+      - type: custom:mushroom-entity-card
+        entity: sensor.teplomer_bazen_battery
+        name: Batéria
+        icon_color: blue
+
+  - type: custom:mushroom-select-card
+    entity: select.pool_heating_mode
+    name: Režim
+    icon: mdi:tune
+
+  - type: custom:mini-graph-card
+    entities:
+      - entity: sensor.teplomer_bazen_temperature
+        name: Teplota bazéna
+        color: "#00bb33"
+        color_thresholds:
+          - value: 22
+            color: "#f39c12"
+          - value: 26
+            color: "#27ae60"
+          - value: 28
+            color: "#00bb33"
+      - entity: switch.sonoff_10013cc5bd
+        name: Čerpadlo
+        color: "#e67e22"
+        show_line: false
+        show_points: false
+        show_fill: true
+        y_axis: secondary
+        show_legend: true
+      - color: rgba(128,128,128,0.3)
+        entity: sensor.night_state
+        name: Noc
+        show_line: false
+        show_points: false
+        show_fill: true
+        y_axis: secondary
+        show_legend: false
+    hours_to_show: 72
+    line_width: 2
+    points_per_hour: 2
+    font_size: 50
+    animate: true
+    show:
+      name: false
+      icon: false
+      legend: true

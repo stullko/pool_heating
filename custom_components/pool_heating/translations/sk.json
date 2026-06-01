@@ -1,0 +1,115 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Riadenie ohrevu bazéna",
+        "description": "Vyber entity na čítanie a spínač tepelného čerpadla na ovládanie. Snímač teploty vody v bazéne je povinný.",
+        "data": {
+          "name": "Názov",
+          "pool_temp_entity": "Snímač teploty vody v bazéne",
+          "heat_pump_switch": "Spínač tepelného čerpadla",
+          "outdoor_temp_entity": "Snímač vonkajšej teploty (voliteľné)",
+          "filtration_entity": "Filtrácia bazéna (voliteľné, podmienka ohrevu)",
+          "electricity_expensive_entity": "Binárny senzor drahej elektriny (voliteľné)",
+          "day_entity": "Binárny senzor dňa (voliteľné)",
+          "weather_entity": "Entita počasia (voliteľné)",
+          "rain_intensity_entity": "Senzor intenzity dažďa (voliteľné, naživo)",
+          "illuminance_entity": "Senzor osvetlenia (voliteľné, proxy slnka)",
+          "shmu_station": "ID stanice SHMÚ"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Táto stanica SHMÚ je už nakonfigurovaná."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Nastavenia ohrevu bazéna",
+        "data": {
+          "target_temp": "Cieľová teplota",
+          "hysteresis": "Hysteréza",
+          "night_start": "Začiatok noci",
+          "night_end": "Koniec noci",
+          "active_start": "Začiatok denného okna",
+          "active_end": "Koniec denného okna",
+          "min_operating_outdoor_temp": "Min. vonkajšia teplota pre prevádzku",
+          "longterm_max_threshold": "Dlhodobá užitočná denná max. teplota",
+          "cold_lookahead_days": "Výhľad chladu (dni)",
+          "rain_mm_threshold": "Prah dažďa (mm)",
+          "rain_lookahead_h": "Výhľad dažďa (hodiny)",
+          "price_policy": "Politika ceny elektriny",
+          "catchup_deficit_c": "Dobehový deficit",
+          "min_on_minutes": "Minimálny čas zapnutia",
+          "min_off_minutes": "Minimálny čas vypnutia",
+          "horizon_days": "Horizont predpovede (dni)",
+          "manage_filtration": "Zapnúť filtráciu pri ohreve",
+          "frost_protect_enabled": "Ochrana pred mrazom",
+          "frost_temp": "Teplota ochrany pred mrazom",
+          "rain_intensity_threshold": "Prah intenzity dažďa (nad = prší)",
+          "pool_volume_l": "Objem bazéna (L, voliteľné)",
+          "heat_pump_kw": "El. príkon čerpadla (kW)",
+          "heat_pump_thermal_kw": "Tepelný výkon čerpadla (kW)",
+          "cop": "COP čerpadla (voliteľné, inak tepelný/el.)"
+        }
+      }
+    }
+  },
+  "selector": {
+    "price_policy": {
+      "options": {
+        "cheap_only": "Len lacná elektrina",
+        "cheap_preferred": "Lacná preferovaná (dobehne ak treba)",
+        "ignore": "Ignorovať cenu"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Stav",
+        "state": {
+          "heating": "Hreje",
+          "target_reached": "Cieľ dosiahnutý",
+          "idle_band": "Tesne pod cieľom",
+          "night_off": "Nočný režim",
+          "waiting_filtration": "Čaká na filtráciu",
+          "waiting_cold_now": "Vonku je chladno",
+          "waiting_rain": "Čaká (dážď)",
+          "waiting_cold": "Čaká (dlhodobý chlad)",
+          "waiting_better_window": "Čaká na lepšie okno",
+          "waiting_price": "Čaká (drahá elektrina)",
+          "no_window": "Bez vhodného okna",
+          "frost_protect": "Ochrana pred mrazom",
+          "manual_override": "Manuálne ovládanie",
+          "sensor_unavailable": "Snímač nedostupný",
+          "forecast_unavailable": "Predpoveď nedostupná",
+          "compressor_protect": "Ochrana kompresora",
+          "mode_off": "Vypnuté"
+        }
+      },
+      "predicted_ready": { "name": "Predpokladané dohriatie" },
+      "required_heating_hours": { "name": "Potrebné hodiny ohrevu" },
+      "energy_needed": { "name": "Potrebná energia" },
+      "heat_rate": { "name": "Rýchlosť ohrevu" },
+      "loss_coefficient": { "name": "Koeficient strát" },
+      "model_confidence": { "name": "Dôvera modelu" },
+      "energy_consumed": { "name": "Spotrebovaná energia" },
+      "power": { "name": "Príkon" }
+    },
+    "binary_sensor": {
+      "should_heat": { "name": "Má hriať" }
+    },
+    "select": {
+      "mode": {
+        "name": "Režim",
+        "state": {
+          "auto": "Automaticky",
+          "off": "Vypnuté",
+          "force_on": "Vynútene zapnuté"
+        }
+      }
+    }
+  }
+}

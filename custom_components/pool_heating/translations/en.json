@@ -1,0 +1,115 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Pool Heating Controller",
+        "description": "Select the entities to read and the heat-pump switch to control. The pool water temperature sensor is required.",
+        "data": {
+          "name": "Name",
+          "pool_temp_entity": "Pool water temperature sensor",
+          "heat_pump_switch": "Heat pump switch",
+          "outdoor_temp_entity": "Outdoor temperature sensor (optional)",
+          "filtration_entity": "Pool filtration (optional, prerequisite for heating)",
+          "electricity_expensive_entity": "Expensive-electricity binary sensor (optional)",
+          "day_entity": "Daytime binary sensor (optional)",
+          "weather_entity": "Weather entity (optional)",
+          "rain_intensity_entity": "Rain intensity sensor (optional, real-time)",
+          "illuminance_entity": "Illuminance sensor (optional, solar proxy)",
+          "shmu_station": "SHMU station id"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This SHMU station is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Pool heating settings",
+        "data": {
+          "target_temp": "Target temperature",
+          "hysteresis": "Hysteresis",
+          "night_start": "Night start",
+          "night_end": "Night end",
+          "active_start": "Active window start",
+          "active_end": "Active window end",
+          "min_operating_outdoor_temp": "Minimum operating outdoor temperature",
+          "longterm_max_threshold": "Long-term useful daily max temperature",
+          "cold_lookahead_days": "Cold look-ahead (days)",
+          "rain_mm_threshold": "Rain threshold (mm)",
+          "rain_lookahead_h": "Rain look-ahead (hours)",
+          "price_policy": "Electricity price policy",
+          "catchup_deficit_c": "Catch-up deficit",
+          "min_on_minutes": "Minimum on time",
+          "min_off_minutes": "Minimum off time",
+          "horizon_days": "Forecast horizon (days)",
+          "manage_filtration": "Turn on filtration when heating",
+          "frost_protect_enabled": "Frost protection",
+          "frost_temp": "Frost protection temperature",
+          "rain_intensity_threshold": "Rain intensity threshold (rain if above)",
+          "pool_volume_l": "Pool volume (L, optional)",
+          "heat_pump_kw": "Heat pump electrical power (kW)",
+          "heat_pump_thermal_kw": "Heat pump thermal output (kW)",
+          "cop": "Heat pump COP (optional, else thermal/electrical)"
+        }
+      }
+    }
+  },
+  "selector": {
+    "price_policy": {
+      "options": {
+        "cheap_only": "Cheap electricity only",
+        "cheap_preferred": "Cheap preferred (catch up if needed)",
+        "ignore": "Ignore price"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "heating": "Heating",
+          "target_reached": "Target reached",
+          "idle_band": "Just below target",
+          "night_off": "Night mode",
+          "waiting_filtration": "Waiting for filtration",
+          "waiting_cold_now": "Outdoor too cold",
+          "waiting_rain": "Waiting (rain)",
+          "waiting_cold": "Waiting (long-term cold)",
+          "waiting_better_window": "Waiting for a better window",
+          "waiting_price": "Waiting (expensive electricity)",
+          "no_window": "No suitable window",
+          "frost_protect": "Frost protection",
+          "manual_override": "Manual override",
+          "sensor_unavailable": "Sensor unavailable",
+          "forecast_unavailable": "Forecast unavailable",
+          "compressor_protect": "Compressor protection",
+          "mode_off": "Off"
+        }
+      },
+      "predicted_ready": { "name": "Predicted ready" },
+      "required_heating_hours": { "name": "Required heating hours" },
+      "energy_needed": { "name": "Energy needed" },
+      "heat_rate": { "name": "Heating rate" },
+      "loss_coefficient": { "name": "Loss coefficient" },
+      "model_confidence": { "name": "Model confidence" },
+      "energy_consumed": { "name": "Energy consumed" },
+      "power": { "name": "Power" }
+    },
+    "binary_sensor": {
+      "should_heat": { "name": "Should heat" }
+    },
+    "select": {
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "auto": "Automatic",
+          "off": "Off",
+          "force_on": "Force on"
+        }
+      }
+    }
+  }
+}
