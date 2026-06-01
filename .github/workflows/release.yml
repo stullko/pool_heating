@@ -1,0 +1,20 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip the integration
+        run: |
+          cd custom_components/pool_heating
+          zip -r ../../pool_heating.zip .
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pool_heating.zip

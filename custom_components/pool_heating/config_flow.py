@@ -28,12 +28,14 @@ def _entity(domain) -> EntitySelector:
 
 
 def _num(lo, hi, step, unit=None) -> NumberSelector:
-    return NumberSelector(
-        NumberSelectorConfig(
-            min=lo, max=hi, step=step, unit_of_measurement=unit,
-            mode=NumberSelectorMode.BOX,
-        )
+    config = NumberSelectorConfig(
+        min=lo, max=hi, step=step, mode=NumberSelectorMode.BOX,
     )
+    # HA's NumberSelector validates unit_of_measurement as `str`; passing None
+    # (key present, value None) raises vol.Invalid and breaks the flow form.
+    if unit is not None:
+        config["unit_of_measurement"] = unit
+    return NumberSelector(config)
 
 
 class PoolHeatingConfigFlow(ConfigFlow, domain=c.DOMAIN):
