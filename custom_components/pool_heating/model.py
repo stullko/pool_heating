@@ -145,19 +145,26 @@ def fit_thermo(
     r_a, r_b = _fit_heat_rate(amb_xs, r_ys, r_ws, options)
 
     n_off, n_on = len(off_w), len(r_ws)
+    k_conf = min(
+        1.0,
+        n_off / c.N_OFF_TARGET,
+        span_off / c.SPAN_OFF_MIN_H,
+        max(0.0, (r2 or 0.0) / c.R2_K_MIN),
+    )
+    r_conf = min(1.0, n_on / c.N_ON_TARGET, span_on / c.SPAN_ON_MIN_H)
     trusted = (
         n_off >= c.N_OFF_TARGET and span_off >= c.SPAN_OFF_MIN_H
         and (r2 or 0.0) >= c.R2_K_MIN
         and n_on >= c.N_ON_TARGET and span_on >= c.SPAN_ON_MIN_H
     )
-    conf = 0.5 * min(1.0, n_off / c.N_OFF_TARGET) + 0.5 * min(1.0, n_on / c.N_ON_TARGET)
+    conf = 0.5 * k_conf + 0.5 * r_conf
 
     if not trusted:
-        # Blend learned values toward priors by confidence.
+        # Blend each learned value toward its prior by that value's own signal.
         prior = ThermoModel.default(options)
-        k = conf * k + (1 - conf) * prior.k
-        r_a = conf * r_a + (1 - conf) * prior.r_a
-        r_b = conf * r_b
+        k = k_conf * k + (1 - k_conf) * prior.k
+        r_a = r_conf * r_a + (1 - r_conf) * prior.r_a
+        r_b = r_conf * r_b
 
     return ThermoModel(
         k=round(k, 5), r_a=round(r_a, 4), r_b=round(r_b, 4), solar=c.SOLAR_PRIOR,

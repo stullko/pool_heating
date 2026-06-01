@@ -9,17 +9,18 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import const as c
-from .actuator import Actuator
-from .coordinator import PoolHeatingCoordinator
-from .history import HistoryReader
 from .options import build_options
-from .shmu import ShmuClient
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Pool Heating Controller from a config entry."""
+    from .actuator import Actuator
+    from .coordinator import PoolHeatingCoordinator
+    from .history import HistoryReader
+    from .shmu import ShmuClient
+
     session = async_get_clientsession(hass)
     options = build_options(entry.options)
     station = int(entry.data.get(c.CONF_SHMU_STATION, c.DEFAULT_SHMU_STATION))

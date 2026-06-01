@@ -207,8 +207,9 @@ def _pick(aladin: list[Pair], ecmwf: list[Pair], cutoff_ts: int) -> list[Pair]:
 def _distribute_precip(series: list[Pair]) -> dict[int, float]:
     """Spread each precipitation bucket evenly over the hours it covers.
 
-    ALADIN buckets are ~1 h, ECMWF ~6 h. The amount at timestamp `ts` is the
-    precipitation accumulated in the bucket ending at `ts`.
+    ALADIN buckets are ~1 h, ECMWF ~6 h. The amount at timestamp `ts` is kept
+    on that forecast hour, so "rain within N hours" does not fire early when
+    input timestamps are not exactly hour-aligned.
     """
     out: dict[int, float] = {}
     prev_ts: int | None = None
@@ -223,7 +224,7 @@ def _distribute_precip(series: list[Pair]) -> dict[int, float]:
         bucket_h = min(bucket_h, 6)
         per_hour = val / bucket_h
         for i in range(bucket_h):
-            hour_start = hour_floor_ts(ts) - (i + 1) * 3600
+            hour_start = hour_floor_ts(ts) - i * 3600
             out[hour_start] = out.get(hour_start, 0.0) + per_hour
         prev_ts = ts
     return out
