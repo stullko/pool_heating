@@ -109,6 +109,32 @@ This integration replaces a reactive, `switch`-toggling automation. Once it is
 running and you are happy with the `status` sensor, **disable your old
 automation** so the two don't fight over the heat-pump switch.
 
+## Testing
+
+Pytest is configured for Home Assistant **2026.5.4**. Use Python **3.14** and a
+fresh virtual environment:
+
+```bash
+python -m venv .venv
+python -m pip install -r requirements_test.txt
+python -m pytest
+```
+
+On native Windows, Home Assistant's test harness imports a few Unix-only runner
+modules before pytest loads `conftest.py`. Use the test stubs path for local
+Windows runs:
+
+```powershell
+py -3.14 -m venv .venv314
+.venv314\Scripts\python.exe -m pip install -r requirements_test.txt
+$env:PYTHONPATH = "$PWD\tests\stubs"
+.venv314\Scripts\python.exe -m pytest
+Remove-Item Env:PYTHONPATH
+```
+
+The existing Windows `.venv` may contain an older Home Assistant test harness;
+recreate it before running the tests locally.
+
 ## How the decision works
 
 Ordered guardrails, then optimisation:
