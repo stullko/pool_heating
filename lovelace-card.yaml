@@ -1,5 +1,7 @@
 # Pool Heating Controller - Mushroom-style Lovelace card.
 # Requires HACS frontend cards: Mushroom, mini-graph-card, stack-in-card.
+# This variant assumes the integration/device is named "Tepelné čerpadlo bazéna",
+# so Home Assistant entity ids use the tepelne_cerpadlo_bazena_* prefix.
 # Adjust the source entity ids below if your pool sensors have different names:
 #   pool water  : sensor.teplomer_bazen_temperature
 #   heat pump   : switch.sonoff_10013cc5bd
@@ -12,12 +14,12 @@ cards:
   - type: custom:mushroom-template-card
     primary: Tepelné čerpadlo bazéna
     secondary: >-
-      {% set reason = state_attr('sensor.pool_heating_status', 'reason') %}
-      {{ reason if reason else states('sensor.pool_heating_status') }}
+      {% set reason = state_attr('sensor.tepelne_cerpadlo_bazena_status', 'reason') %}
+      {{ reason if reason else states('sensor.tepelne_cerpadlo_bazena_status') }}
     multiline_secondary: true
     icon: mdi:pool
     icon_color: >-
-      {% set status = states('sensor.pool_heating_status') %}
+      {% set status = states('sensor.tepelne_cerpadlo_bazena_status') %}
       {{ {
         'heating': 'red',
         'frost_protect': 'red',
@@ -38,45 +40,45 @@ cards:
         'forecast_unavailable': 'orange'
       }.get(status, 'grey') }}
     badge_icon: >-
-      {% if is_state('binary_sensor.pool_heating_should_heat', 'on') %}
+      {% if is_state('binary_sensor.tepelne_cerpadlo_bazena_should_heat', 'on') %}
         mdi:fire
       {% else %}
         mdi:power-sleep
       {% endif %}
     badge_color: >-
-      {% if is_state('binary_sensor.pool_heating_should_heat', 'on') %}
+      {% if is_state('binary_sensor.tepelne_cerpadlo_bazena_should_heat', 'on') %}
         red
       {% else %}
         grey
       {% endif %}
     tap_action:
       action: more-info
-      entity: sensor.pool_heating_status
+      entity: sensor.tepelne_cerpadlo_bazena_status
 
   - type: custom:mushroom-chips-card
     alignment: center
     chips:
       - type: template
-        entity: binary_sensor.pool_heating_should_heat
+        entity: binary_sensor.tepelne_cerpadlo_bazena_should_heat
         icon: >-
-          {{ 'mdi:radiator' if is_state('binary_sensor.pool_heating_should_heat', 'on')
+          {{ 'mdi:radiator' if is_state('binary_sensor.tepelne_cerpadlo_bazena_should_heat', 'on')
              else 'mdi:radiator-off' }}
         icon_color: >-
-          {{ 'red' if is_state('binary_sensor.pool_heating_should_heat', 'on') else 'grey' }}
+          {{ 'red' if is_state('binary_sensor.tepelne_cerpadlo_bazena_should_heat', 'on') else 'grey' }}
         content: >-
-          {{ 'Hriať' if is_state('binary_sensor.pool_heating_should_heat', 'on') else 'Nehriať' }}
+          {{ 'Hriať' if is_state('binary_sensor.tepelne_cerpadlo_bazena_should_heat', 'on') else 'Nehriať' }}
       - type: template
-        entity: select.pool_heating_mode
+        entity: select.tepelne_cerpadlo_bazena_mode
         icon: mdi:tune
         icon_color: >-
-          {{ {'auto':'green','force_on':'red','off':'grey'}.get(states('select.pool_heating_mode'), 'grey') }}
-        content: "{{ states('select.pool_heating_mode') }}"
+          {{ {'auto':'green','force_on':'red','off':'grey'}.get(states('select.tepelne_cerpadlo_bazena_mode'), 'grey') }}
+        content: "{{ states('select.tepelne_cerpadlo_bazena_mode') }}"
       - type: template
-        entity: sensor.pool_heating_predicted_ready
+        entity: sensor.tepelne_cerpadlo_bazena_predicted_ready
         icon: mdi:calendar-clock
         icon_color: teal
         content: >-
-          {% set value = states('sensor.pool_heating_predicted_ready') %}
+          {% set value = states('sensor.tepelne_cerpadlo_bazena_predicted_ready') %}
           {{ as_timestamp(value) | timestamp_custom('%a %H:%M') if value not in ['unknown','unavailable','none','None',''] else 'bez odhadu' }}
 
   - type: grid
@@ -94,7 +96,7 @@ cards:
         icon: mdi:thermometer
         icon_color: orange
       - type: custom:mushroom-entity-card
-        entity: sensor.pool_heating_predicted_ready
+        entity: sensor.tepelne_cerpadlo_bazena_predicted_ready
         name: Dohriatie
         icon: mdi:calendar-clock
         icon_color: teal
@@ -104,28 +106,28 @@ cards:
         icon: mdi:battery
         icon_color: blue
       - type: custom:mushroom-entity-card
-        entity: sensor.pool_heating_required_heating_hours
+        entity: sensor.tepelne_cerpadlo_bazena_required_heating_hours
         name: Potrebný ohrev
         icon: mdi:timer-sand
         icon_color: amber
       - type: custom:mushroom-entity-card
-        entity: sensor.pool_heating_energy_needed
+        entity: sensor.tepelne_cerpadlo_bazena_energy_needed
         name: Potrebná energia
         icon: mdi:lightning-bolt
         icon_color: amber
       - type: custom:mushroom-entity-card
-        entity: sensor.pool_heating_power
+        entity: sensor.tepelne_cerpadlo_bazena_power
         name: Príkon
         icon: mdi:flash
         icon_color: red
       - type: custom:mushroom-entity-card
-        entity: sensor.pool_heating_energy_consumed
+        entity: sensor.tepelne_cerpadlo_bazena_energy_consumed
         name: Spotreba
         icon: mdi:lightning-bolt-circle
         icon_color: purple
 
   - type: custom:mushroom-select-card
-    entity: select.pool_heating_mode
+    entity: select.tepelne_cerpadlo_bazena_mode
     name: Režim
     icon: mdi:tune
 
@@ -134,17 +136,17 @@ cards:
     square: false
     cards:
       - type: custom:mushroom-entity-card
-        entity: sensor.pool_heating_heat_rate
+        entity: sensor.tepelne_cerpadlo_bazena_heat_rate
         name: Rýchlosť ohrevu
         icon: mdi:thermometer-chevron-up
         icon_color: red
       - type: custom:mushroom-entity-card
-        entity: sensor.pool_heating_loss_coefficient
+        entity: sensor.tepelne_cerpadlo_bazena_loss_coefficient
         name: Tepelná strata
         icon: mdi:thermometer-chevron-down
         icon_color: blue
       - type: custom:mushroom-entity-card
-        entity: sensor.pool_heating_model_confidence
+        entity: sensor.tepelne_cerpadlo_bazena_model_confidence
         name: Model
         icon: mdi:school
         icon_color: teal
@@ -168,7 +170,7 @@ cards:
         show_points: false
         show_fill: true
         y_axis: secondary
-      - entity: binary_sensor.pool_heating_should_heat
+      - entity: binary_sensor.tepelne_cerpadlo_bazena_should_heat
         name: Odporúčanie
         color: "#f03e3e"
         show_line: false
