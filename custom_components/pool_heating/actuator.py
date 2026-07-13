@@ -4,11 +4,17 @@ Guards: idempotent service calls (only act on a real change), anti-short-cycle
 (min on/off based on the switch's own last_changed), filtration prerequisite,
 and never fighting an unavailable switch. Hard guardrail "off" reasons (night,
 target, sensor loss, filtration off, mode off) may cut a short ON cycle.
+
+`async_apply` returns the Decision that actually took effect: when a guard
+suppresses the requested change, the returned decision carries a truthful
+status (compressor_protect / waiting_filtration) instead of the engine's.
 """
 
 from __future__ import annotations
 
 import logging
+import math
+from dataclasses import replace
 
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -63,14 +69,15 @@ class Actuator:
     def update_options(self, options: EngineOptions) -> None:
         self._options = options
 
-    async def async_apply(self, decision: Decision) -> None:
+    async def async_apply(self, decision: Decision) -> Decision:
+        """Drive the switch; return the decision that actually took effect."""
         if decision.action == c.ACTION_HOLD:
-            return
+            return decision
 
         want_on = decision.action == c.ACTION_TURN_ON
         state = self._hass.states.get(self._switch)
         if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return  # never fight an unknown/unavailable switch
+            return decision  # never fight an unknown/unavailable switch
 
         current_on = state.state == STATE_ON
         elapsed_min = (dt_util.utcnow() - state.last_changed).total_seconds() / 60.0
@@ -81,20 +88,43 @@ class Actuator:
             and elapsed_min < self._options.min_on_minutes
             and decision.status not in _GUARDRAIL_OFF
         ):
-            return
+            left = math.ceil(self._options.min_on_minutes - elapsed_min)
+            return replace(
+                decision, action=c.ACTION_HOLD, status=c.STATUS_COMPRESSOR_PROTECT,
+                reason_sk=(f"Ochrana kompresora: nechávam dobehnúť minimálny čas chodu "
+                           f"({self._options.min_on_minutes} min, zostáva ~{left} min)."),
+                reason_en="Compressor min-on protection",
+            )
         if (
             not current_on and want_on
             and elapsed_min < self._options.min_off_minutes
             and decision.status != c.STATUS_FROST_PROTECT
         ):
-            return
+            left = math.ceil(self._options.min_off_minutes - elapsed_min)
+            return replace(
+                decision, action=c.ACTION_HOLD, status=c.STATUS_COMPRESSOR_PROTECT,
+                reason_sk=(f"Ochrana kompresora: pred štartom čakám minimálny čas "
+                           f"vypnutia ({self._options.min_off_minutes} min, "
+                           f"zostáva ~{left} min)."),
+                reason_en="Compressor min-off protection",
+            )
 
-        if want_on:
-            await self._ensure_filtration_on()
+        if want_on and not await self._ensure_filtration_on():
+            _LOGGER.warning(
+                "Not starting heat pump %s: filtration %s is not confirmed running",
+                self._switch, self._filtration,
+            )
+            return replace(
+                decision, should_heat=False, action=c.ACTION_HOLD,
+                status=c.STATUS_WAITING_FILTRATION,
+                reason_sk=("Nehrejem: filtráciu sa nepodarilo zapnúť alebo je "
+                           "nedostupná — čerpadlo bez prúdenia vody nespustím."),
+                reason_en="Filtration could not be ensured",
+            )
 
         if current_on == want_on:
             self._last_command = want_on  # already in desired state; remember intent
-            return
+            return decision
 
         service = SERVICE_TURN_ON if want_on else SERVICE_TURN_OFF
         try:
@@ -105,18 +135,24 @@ class Actuator:
             _LOGGER.debug("Heat pump %s (%s)", service, decision.status)
         except Exception as err:  # noqa: BLE001 - must not crash the update loop
             _LOGGER.warning("Failed to %s %s: %s", service, self._switch, err)
+        return decision
 
-    async def _ensure_filtration_on(self) -> None:
+    async def _ensure_filtration_on(self) -> bool:
+        """Return True when water flow is assured (running, started, or unmanaged)."""
         if not (self._options.manage_filtration and self._filtration):
-            return
+            return True
         state = self._hass.states.get(self._filtration)
-        if state is None or state.state == STATE_ON:
-            return
+        if state is not None and state.state == STATE_ON:
+            return True
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return False  # cannot verify water flow -> never start the pump dry
         domain = self._filtration.split(".", 1)[0]
         try:
             await self._hass.services.async_call(
                 domain, SERVICE_TURN_ON, {ATTR_ENTITY_ID: self._filtration}, blocking=True
             )
             _LOGGER.debug("Enabled filtration %s before heating", self._filtration)
+            return True
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("Failed to enable filtration %s: %s", self._filtration, err)
+            return False

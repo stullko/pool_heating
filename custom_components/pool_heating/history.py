@@ -32,15 +32,19 @@ class HistoryReader:
         pool_entity: str,
         switch_entity: str,
         outdoor_entity: str | None,
+        illuminance_entity: str | None = None,
     ) -> None:
         self._hass = hass
         self._pool = pool_entity
         self._switch = switch_entity
         self._outdoor = outdoor_entity
+        self._illuminance = illuminance_entity
 
     async def async_fit_model(self, options: EngineOptions) -> ThermoModel:
         start = dt_util.utcnow() - timedelta(days=HISTORY_LOOKBACK_DAYS)
-        entity_ids = [e for e in (self._pool, self._switch, self._outdoor) if e]
+        entity_ids = [
+            e for e in (self._pool, self._switch, self._outdoor, self._illuminance) if e
+        ]
         states = await get_instance(self._hass).async_add_executor_job(
             self._load, start, entity_ids
         )
@@ -49,7 +53,10 @@ class HistoryReader:
         outdoor = (
             _to_samples(states.get(self._outdoor, [])) if self._outdoor else None
         )
-        return fit_thermo(pool, switch, outdoor, options)
+        illuminance = (
+            _to_samples(states.get(self._illuminance, [])) if self._illuminance else None
+        )
+        return fit_thermo(pool, switch, outdoor, options, illuminance_series=illuminance)
 
     def _load(self, start: datetime, entity_ids: list[str]) -> dict:
         """Blocking — runs in the recorder DB executor thread."""

@@ -11,16 +11,22 @@
           "outdoor_temp_entity": "Outdoor temperature sensor (optional)",
           "filtration_entity": "Pool filtration (optional, prerequisite for heating)",
           "electricity_expensive_entity": "Expensive-electricity binary sensor (optional)",
+          "price_entity": "Electricity price sensor (optional, EUR/kWh)",
+          "power_entity": "Heat-pump power sensor (optional, W or kW)",
           "day_entity": "Daytime binary sensor (optional)",
-          "weather_entity": "Weather entity (optional)",
+          "weather_entity": "Weather entity (optional, outdoor-temperature fallback)",
           "rain_intensity_entity": "Rain intensity sensor (optional, real-time)",
           "illuminance_entity": "Illuminance sensor (optional, solar proxy)",
           "shmu_station": "SHMU station id"
         }
       }
     },
+    "error": {
+      "cannot_connect": "Could not reach SHMU — check your connection and try again.",
+      "invalid_station": "This SHMU station publishes no ALADIN/ECMWF forecast — try a different station id."
+    },
     "abort": {
-      "already_configured": "This SHMU station is already configured."
+      "already_configured": "This heat-pump switch is already managed by another entry."
     }
   },
   "options": {
@@ -40,6 +46,7 @@
           "rain_mm_threshold": "Rain threshold (mm)",
           "rain_lookahead_h": "Rain look-ahead (hours)",
           "price_policy": "Electricity price policy",
+          "price_expensive_threshold": "Expensive-price threshold (EUR/kWh)",
           "catchup_deficit_c": "Catch-up deficit",
           "min_on_minutes": "Minimum on time",
           "min_off_minutes": "Minimum off time",

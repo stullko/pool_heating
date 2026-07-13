@@ -7,6 +7,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
     EntitySelector,
@@ -43,16 +44,33 @@ class PoolHeatingConfigFlow(ConfigFlow, domain=c.DOMAIN):
 
     VERSION = 1
 
+    async def _async_validate_station(self, station: int) -> str | None:
+        """Return an error key when the SHMU station is unusable."""
+        from .shmu import ShmuClient, ShmuError
+
+        client = ShmuClient(async_get_clientsession(self.hass), station, timeout=15)
+        try:
+            if not await client.async_station_has_products():
+                return "invalid_station"
+        except ShmuError:
+            return "cannot_connect"
+        return None
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
         if user_input is not None:
             station = int(user_input[c.CONF_SHMU_STATION])
             user_input[c.CONF_SHMU_STATION] = station
-            await self.async_set_unique_id(str(station))
-            self._abort_if_unique_id_configured()
-            return self.async_create_entry(
-                title=user_input.get(c.CONF_NAME, c.DEFAULT_NAME), data=user_input
-            )
+            error = await self._async_validate_station(station)
+            if error is None:
+                # One entry per controlled heat pump; the SHMU station may be
+                # shared by several pools.
+                await self.async_set_unique_id(user_input[c.CONF_HEAT_PUMP_SWITCH])
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(
+                    title=user_input.get(c.CONF_NAME, c.DEFAULT_NAME), data=user_input
+                )
+            errors[c.CONF_SHMU_STATION] = error
 
         schema = vol.Schema(
             {
@@ -62,6 +80,8 @@ class PoolHeatingConfigFlow(ConfigFlow, domain=c.DOMAIN):
                 vol.Optional(c.CONF_OUTDOOR_TEMP_ENTITY): _entity("sensor"),
                 vol.Optional(c.CONF_FILTRATION_ENTITY): _entity(["input_boolean", "switch"]),
                 vol.Optional(c.CONF_ELECTRICITY_EXPENSIVE_ENTITY): _entity("binary_sensor"),
+                vol.Optional(c.CONF_PRICE_ENTITY): _entity("sensor"),
+                vol.Optional(c.CONF_POWER_ENTITY): _entity("sensor"),
                 vol.Optional(c.CONF_DAY_ENTITY): _entity("binary_sensor"),
                 vol.Optional(c.CONF_WEATHER_ENTITY): _entity("weather"),
                 vol.Optional(c.CONF_RAIN_INTENSITY_ENTITY): _entity("sensor"),
@@ -71,6 +91,8 @@ class PoolHeatingConfigFlow(ConfigFlow, domain=c.DOMAIN):
                 ),
             }
         )
+        if user_input is not None:
+            schema = self.add_suggested_values_to_schema(schema, user_input)
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     @staticmethod
@@ -145,6 +167,8 @@ class PoolHeatingOptionsFlow(OptionsFlow):
                         )
                     ),
                 ),
+                opt_num(c.CONF_PRICE_EXPENSIVE_THRESHOLD,
+                        c.DEFAULT_PRICE_EXPENSIVE_THRESHOLD, 0, 2, 0.01, "EUR/kWh"),
                 opt_num(c.CONF_CATCHUP_DEFICIT_C, c.DEFAULT_CATCHUP_DEFICIT_C, 0, 10, 0.5, "°C"),
                 opt_num(c.CONF_MIN_ON_MINUTES, c.DEFAULT_MIN_ON_MINUTES, 0, 180, 5, "min"),
                 opt_num(c.CONF_MIN_OFF_MINUTES, c.DEFAULT_MIN_OFF_MINUTES, 0, 180, 5, "min"),

@@ -7,7 +7,7 @@ Slovak status. Ordered: hard guardrails first, optimisation last.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from . import const as c
@@ -32,8 +32,10 @@ class DecisionInputs:
     model: ThermoModel
     options: EngineOptions
     mode: str = c.MODE_AUTO
-    filtration_on: bool | None = None       # None => not configured (no constraint)
+    filtration_on: bool | None = None       # None => not configured or unavailable
+    filtration_configured: bool = False
     electricity_expensive: bool | None = None
+    electricity_price: float | None = None  # EUR/kWh, informational
     day_on: bool | None = None
     switch_is_on: bool | None = None
     manual_override: bool = False
@@ -52,7 +54,9 @@ class Decision:
     predicted_ready: datetime | None = None
     required_hours: float | None = None
     energy_kwh: float | None = None
+    energy_cost_eur: float | None = None
     next_window: datetime | None = None
+    trajectory: list[tuple[datetime, float]] = field(default_factory=list)
 
 
 def decide(inp: DecisionInputs) -> Decision:
@@ -67,6 +71,12 @@ def decide(inp: DecisionInputs) -> Decision:
         else Projection(None, 0.0, None, [])
     )
 
+    cost = (
+        round(proj.energy_kwh * inp.electricity_price, 2)
+        if proj.energy_kwh is not None and inp.electricity_price is not None
+        else None
+    )
+
     def out(should_heat, action, status, reason_sk, reason_en="", **kw):
         return Decision(
             should_heat=should_heat, action=action, status=status,
@@ -74,6 +84,8 @@ def decide(inp: DecisionInputs) -> Decision:
             predicted_ready=proj.predicted_ready,
             required_hours=round(proj.required_hours, 1) if proj.required_hours else None,
             energy_kwh=proj.energy_kwh,
+            energy_cost_eur=cost,
+            trajectory=proj.trajectory,
             **kw,
         )
 
@@ -104,6 +116,10 @@ def decide(inp: DecisionInputs) -> Decision:
                    "Manual override")
 
     # 3. Filtration prerequisite (pump needs water flow) --------------------
+    if inp.filtration_configured and inp.filtration_on is None:
+        return out(False, c.ACTION_TURN_OFF, c.STATUS_WAITING_FILTRATION,
+                   "Nehrejem: stav filtrácie je nedostupný — bez overeného prúdenia "
+                   "vody čerpadlo nespúšťam.", "Filtration state unavailable")
     if inp.filtration_on is False and not o.manage_filtration:
         return out(False, c.ACTION_TURN_OFF, c.STATUS_WAITING_FILTRATION,
                    "Nehrejem: filtrácia je vypnutá — čerpadlo potrebuje prúdenie vody.",
@@ -200,9 +216,13 @@ def decide(inp: DecisionInputs) -> Decision:
     if inp.electricity_expensive and o.price_policy != c.PRICE_POLICY_IGNORE:
         deficit = o.target_temp - pool
         if o.price_policy == c.PRICE_POLICY_CHEAP_ONLY or deficit < o.catchup_deficit_c:
+            price_sk = (
+                f" Aktuálna cena {inp.electricity_price:.2f} €/kWh."
+                if inp.electricity_price is not None else ""
+            )
             return out(False, c.ACTION_TURN_OFF, c.STATUS_WAITING_PRICE,
                        "Nehrejem: elektrina je teraz drahá, počasie je vhodné — "
-                       "čakám na lacnejšiu hodinu.", "Waiting for cheaper price",
+                       f"čakám na lacnejšiu hodinu.{price_sk}", "Waiting for cheaper price",
                        next_window=win)
         # cheap_preferred + big deficit => catch up even though it's expensive
 

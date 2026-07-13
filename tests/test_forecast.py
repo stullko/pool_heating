@@ -80,3 +80,13 @@ def test_missing_fields_no_crash():
     assert fc.hourly == []
     assert fc.daily == []
     assert fc.current_temp is None
+
+
+def test_ecmwf_ensemble_rows_use_median_percentile():
+    base = 1_780_000_000
+    rows = [[base + i * 3600, 10.0, 12.0, 15.0, 18.0, 20.0] for i in range(24)]
+    ecmwf = {"Air_temperature_at_2m": {"data": rows}}
+    now = datetime.fromtimestamp(base, timezone.utc)
+    fc = F.build_normalized(None, ecmwf, now)
+    assert fc.hourly[0].temp == 15.0  # p50, not the p10 low bound
+    assert fc.current_temp == 15.0

@@ -35,6 +35,16 @@ class ShmuClient:
         self._timeout = timeout
         self._cache: dict[str, dict] = {}  # file_link -> raw field map
 
+    async def async_station_has_products(self) -> bool:
+        """Cheap validity check: does the station publish ALADIN or ECMWF?"""
+        products = await self._get_json(
+            SHMU_PRODUCTS_URL.format(station=self._station)
+        )
+        return bool(
+            self._first_of_type(products, "aladin")
+            or self._first_of_type(products, "ecmwf")
+        )
+
     async def async_get_forecast(self) -> NormalizedForecast:
         """Fetch + normalize the latest ALADIN and ECMWF runs."""
         products = await self._get_json(
@@ -47,6 +57,10 @@ class ShmuClient:
         ecmwf = await self._get_run(ecmwf_link) if ecmwf_link else None
         if aladin is None and ecmwf is None:
             raise ShmuError("no ALADIN or ECMWF product available for station")
+
+        # Drop superseded runs; keep only the links that are still current.
+        current = {aladin_link, ecmwf_link}
+        self._cache = {k: v for k, v in self._cache.items() if k in current}
 
         return build_normalized(aladin, ecmwf, datetime.now(UTC))
 
@@ -71,7 +85,7 @@ class ShmuClient:
         raw = await self._get_json(SHMU_DATA_URL.format(file_link=file_link))
         if not isinstance(raw, dict):
             raise ShmuError(f"unexpected payload for run {file_link}")
-        self._cache = {file_link: raw}  # keep only the most recent run
+        self._cache[file_link] = raw
         return raw
 
     async def _get_json(self, url: str):

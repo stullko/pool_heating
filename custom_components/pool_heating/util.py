@@ -30,6 +30,18 @@ def _local_tz():
 LOCAL_TZ = _local_tz()
 
 
+def set_local_tz(tz) -> None:
+    """Override the local timezone (Home Assistant's configured zone).
+
+    The pure modules cannot read hass.config; the integration calls this at
+    setup so night/active windows follow the user's HA timezone instead of
+    the packaged default.
+    """
+    global LOCAL_TZ
+    if tz is not None:
+        LOCAL_TZ = tz
+
+
 def as_utc(dt: datetime) -> datetime:
     """Return a timezone-aware datetime in UTC."""
     if dt.tzinfo is None:

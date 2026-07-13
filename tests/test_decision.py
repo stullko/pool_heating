@@ -98,6 +98,12 @@ def test_filtration_required():
     assert _decide(pool_temp=24.0, filtration_on=False).status == C.STATUS_WAITING_FILTRATION
 
 
+def test_filtration_unavailable_fails_safe():
+    d = _decide(pool_temp=24.0, filtration_on=None, filtration_configured=True)
+    assert d.status == C.STATUS_WAITING_FILTRATION
+    assert d.should_heat is False
+
+
 def test_outdoor_too_cold_now():
     assert _decide(pool_temp=24.0, outdoor_temp=12.0).status == C.STATUS_WAITING_COLD_NOW
 
@@ -143,3 +149,23 @@ def test_manual_override_holds():
 def test_reason_is_slovak_nonempty():
     d = _decide(pool_temp=24.0)
     assert d.reason_sk and "Hrejem" in d.reason_sk
+
+
+def test_price_shown_in_waiting_reason():
+    d = _decide(pool_temp=27.0, electricity_expensive=True, electricity_price=0.32)
+    assert d.status == C.STATUS_WAITING_PRICE
+    assert "0.32" in d.reason_sk
+
+
+def test_energy_cost_estimated_from_price():
+    d = _decide(pool_temp=24.0, electricity_expensive=False, electricity_price=0.20)
+    assert d.energy_kwh is not None
+    assert d.energy_cost_eur == round(d.energy_kwh * 0.20, 2)
+
+
+def test_trajectory_attached_for_graphing():
+    d = _decide(pool_temp=24.0, electricity_expensive=False)
+    assert d.trajectory
+    when, temp = d.trajectory[0]
+    assert when.tzinfo is not None
+    assert isinstance(temp, float)

@@ -1,8 +1,10 @@
 """Pure thermodynamic model (no Home Assistant imports).
 
-Two learned behaviours, fitted from recorder history:
+Three learned behaviours, fitted from recorder history:
   * loss coefficient k (Newton cooling) from pump-OFF intervals
+  * solar gain at full sun (degC/h) from pump-OFF intervals with illuminance
   * net heat-up rate r_net(T_amb) = r_a + r_b * T_amb from pump-ON intervals
+    (with the solar contribution subtracted so it is not double-counted)
 
 `project()` integrates the pool temperature forward over the forecast to derive
 the predicted "ready" time and required heating hours. The "~3 days to 28 C"
@@ -87,16 +89,18 @@ def fit_thermo(
     ambient_series: list[Sample] | None,
     options: EngineOptions | None = None,
     now: datetime | None = None,
+    illuminance_series: list[Sample] | None = None,
 ) -> ThermoModel:
-    """Fit loss + heat-rate from history; blend with priors when data is thin."""
+    """Fit loss + solar + heat-rate from history; blend with priors when thin."""
     pts = _clean_series(pool_series)
     if len(pts) < 3 or not ambient_series:
         return ThermoModel.default(options)
 
     off_loss: list[float] = []
+    off_solar: list[float] = []
     off_rate: list[float] = []
     off_w: list[float] = []
-    on_items: list[tuple[float, float, float, float]] = []  # amb, rate, loss, weight
+    on_items: list[tuple[float, float, float, float, float]] = []  # amb, rate, loss, frac, weight
     span_off = span_on = 0.0
 
     for (t0, temp0), (t1, temp1) in zip(pts, pts[1:]):
@@ -115,27 +119,30 @@ def fit_thermo(
             continue  # sensor spike / impossible jump
         t_bar = (temp0 + temp1) / 2.0
         loss = amb - t_bar  # negative when pool warmer than air
+        frac = _solar_frac_mean(illuminance_series, t0, t1)
         if on0:
             span_on += dt_h
-            on_items.append((amb, rate, loss, dt_h))
+            on_items.append((amb, rate, loss, frac, dt_h))
         else:
             if (t_bar - amb) < c.DT_MIN_GRADIENT_C:
                 continue  # too little signal to learn cooling
             off_loss.append(loss)
+            off_solar.append(frac)
             off_rate.append(rate)
             off_w.append(dt_h)
             span_off += dt_h
 
-    # k from OFF pairs: rate = k * loss (through origin).
-    k_fit, r2 = _wls_origin(off_loss, off_rate, off_w)
+    # k (+ solar when illuminance history exists) from OFF pairs.
+    k_fit, s_fit, r2 = _fit_loss_and_solar(off_loss, off_solar, off_rate, off_w)
     k = _clamp(k_fit, c.K_MIN, c.K_MAX) if k_fit is not None else c.K_PRIOR
+    solar = _clamp(s_fit, 0.0, c.SOLAR_MAX) if s_fit is not None else c.SOLAR_PRIOR
 
-    # r_net per ON pair, then linear fit vs ambient.
+    # r_net per ON pair (minus ambient exchange and solar), fit vs ambient.
     amb_xs: list[float] = []
     r_ys: list[float] = []
     r_ws: list[float] = []
-    for amb, rate, loss, w in on_items:
-        r_net = rate - k * loss
+    for amb, rate, loss, frac, w in on_items:
+        r_net = rate - k * loss - solar * frac
         if r_net < -0.2:
             continue  # pump on yet strongly cooling => misattribution
         amb_xs.append(amb)
@@ -163,11 +170,12 @@ def fit_thermo(
         # Blend each learned value toward its prior by that value's own signal.
         prior = ThermoModel.default(options)
         k = k_conf * k + (1 - k_conf) * prior.k
+        solar = k_conf * solar + (1 - k_conf) * prior.solar
         r_a = r_conf * r_a + (1 - r_conf) * prior.r_a
         r_b = r_conf * r_b
 
     return ThermoModel(
-        k=round(k, 5), r_a=round(r_a, 4), r_b=round(r_b, 4), solar=c.SOLAR_PRIOR,
+        k=round(k, 5), r_a=round(r_a, 4), r_b=round(r_b, 4), solar=round(solar, 4),
         n_off=n_off, n_on=n_on, r2_k=round(r2 or 0.0, 3),
         confidence=round(conf, 3), learning=not trusted,
     )
@@ -305,6 +313,52 @@ def _ambient_mean(series: list[Sample], t0: datetime, t1: datetime) -> float | N
     if a is None or b is None:
         return None
     return (a + b) / 2.0
+
+
+def _solar_frac_mean(
+    series: list[Sample] | None, t0: datetime, t1: datetime
+) -> float:
+    """Mean sun fraction 0..1 over a pair (lux / FULL_SUN_LUX); 0 if unknown."""
+    if not series:
+        return 0.0
+    lux = _ambient_mean(series, t0, t1)
+    if lux is None:
+        return 0.0
+    return _clamp(lux / c.FULL_SUN_LUX, 0.0, 1.0)
+
+
+def _fit_loss_and_solar(losses, fracs, rates, ws):
+    """OFF-pair fit rate = k*loss + solar*frac.
+
+    Falls back to the 1-var Newton fit when there is no usable illuminance
+    signal (all fractions ~0) or the system is degenerate.
+    Returns (k, solar|None, r2).
+    """
+    if len(losses) < 3:
+        return None, None, 0.0
+    if not any(f > 0.05 for f in fracs):
+        k, r2 = _wls_origin(losses, rates, ws)
+        return k, None, r2
+    s11 = sum(w * x * x for x, w in zip(losses, ws))
+    s22 = sum(w * f * f for f, w in zip(fracs, ws))
+    s12 = sum(w * x * f for x, f, w in zip(losses, fracs, ws))
+    b1 = sum(w * x * y for x, y, w in zip(losses, rates, ws))
+    b2 = sum(w * f * y for f, y, w in zip(fracs, rates, ws))
+    det = s11 * s22 - s12 * s12
+    if abs(det) < 1e-9:
+        k, r2 = _wls_origin(losses, rates, ws)
+        return k, None, r2
+    k = (b1 * s22 - b2 * s12) / det
+    solar = (b2 * s11 - b1 * s12) / det
+    sw = sum(ws) or 1.0
+    ybar = sum(w * y for y, w in zip(rates, ws)) / sw
+    ss_res = sum(
+        w * (y - k * x - solar * f) ** 2
+        for x, f, y, w in zip(losses, fracs, rates, ws)
+    )
+    ss_tot = sum(w * (y - ybar) ** 2 for y, w in zip(rates, ws))
+    r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+    return k, solar, r2
 
 
 def _interp_dt(series: list[Sample], when: datetime) -> float | None:

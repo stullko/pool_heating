@@ -1,0 +1,53 @@
+# Pool Heating Controller - predicted temperature trajectory.
+# Requires the HACS frontend card "apexcharts-card".
+# The prediction is read from the `forecast` attribute of the
+# sensor.<name>_predicted_ready entity; replace the entity ids below
+# (tepelne_cerpadlo_bazena_* and the pool thermometer) with your own.
+
+type: custom:apexcharts-card
+header:
+  show: true
+  title: Predikcia ohrevu bazéna
+  show_states: false
+graph_span: 5d
+span:
+  start: day
+  offset: -1d
+now:
+  show: true
+  label: teraz
+apex_config:
+  annotations:
+    yaxis:
+      - y: 28            # cieľová teplota — udrž v súlade s nastavením
+        borderColor: "#0ca678"
+        strokeDashArray: 6
+        label:
+          text: Cieľ 28 °C
+          style:
+            background: "#0ca678"
+            color: "#fff"
+yaxis:
+  - decimals: 0
+    apex_config:
+      title:
+        text: "°C"
+series:
+  - entity: sensor.teplomer_bazen_temperature
+    name: Voda (história)
+    color: "#2f9e44"
+    stroke_width: 2
+    extend_to: now
+    group_by:
+      func: avg
+      duration: 30min
+  - entity: sensor.tepelne_cerpadlo_bazena_predicted_ready
+    name: Predikcia
+    color: "#f08c00"
+    stroke_width: 2
+    curve: smooth
+    show:
+      in_header: false
+    data_generator: |
+      return (entity.attributes.forecast || []).map(p =>
+        [new Date(p.datetime).getTime(), p.temperature]);

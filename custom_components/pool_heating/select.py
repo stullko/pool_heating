@@ -31,8 +31,11 @@ class PoolHeatingModeSelect(PoolHeatingEntity, SelectEntity, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         last = await self.async_get_last_state()
-        if last and last.state in MODES:
+        if last and last.state in MODES and last.state != self.coordinator.mode:
+            # Setup normally pre-restores the mode; this is the fallback path,
+            # so re-decide promptly instead of waiting a full tick.
             self.coordinator.set_mode(last.state)
+            await self.coordinator.async_request_refresh()
 
     @property
     def current_option(self) -> str:

@@ -53,6 +53,38 @@ def test_combined_fit_recovers_k_and_rate():
     assert m.learning is False
 
 
+def test_solar_gain_recovered_from_illuminance():
+    """Cooling-only history with a daily sun signal recovers k AND solar."""
+    amb, k, solar = 15.0, 0.02, 0.10
+    pool, ambient, lux = [], [], []
+    temp = 30.0
+    for i in range(240):
+        t = START + timedelta(hours=i)
+        frac = 1.0 if 10 <= (i % 24) <= 16 else 0.0
+        pool.append((t, round(temp, 3)))
+        ambient.append((t, amb))
+        lux.append((t, frac * C.FULL_SUN_LUX))
+        temp = amb + (temp - amb) * math.exp(-k) + solar * frac
+    m = M.fit_thermo(
+        pool, [(START, False)], ambient, OPTS,
+        START + timedelta(hours=240), illuminance_series=lux,
+    )
+    assert abs(m.k - k) < 0.006
+    assert abs(m.solar - solar) < 0.04
+    assert m.solar > C.SOLAR_PRIOR  # learned, not the prior
+
+
+def test_no_illuminance_keeps_solar_prior():
+    amb, k = 15.0, 0.02
+    pool, ambient = [], []
+    for i in range(130):
+        t = START + timedelta(hours=i)
+        pool.append((t, round(amb + (28.0 - amb) * math.exp(-k * i), 3)))
+        ambient.append((t, amb))
+    m = M.fit_thermo(pool, [(START, False)], ambient, OPTS, START + timedelta(hours=130))
+    assert m.solar == C.SOLAR_PRIOR
+
+
 def test_heat_rate_is_clamped():
     m = M.ThermoModel.default(OPTS)
     assert C.R_MIN <= m.heat_rate_at(-50) <= C.R_MAX

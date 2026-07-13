@@ -24,6 +24,8 @@ async def async_get_config_entry_diagnostics(
             "outdoor_temp": data.outdoor_temp,
             "target_temp": data.target_temp,
             "switch_is_on": data.switch_is_on,
+            "electricity_price": data.electricity_price,
+            "power_w": data.power_w,
         },
         "decision": {
             "status": dec.status,

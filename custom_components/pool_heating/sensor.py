@@ -45,6 +45,9 @@ def _status_attrs(d: PoolHeatingData) -> dict[str, Any]:
         "next_window": dec.next_window.isoformat() if dec.next_window else None,
         "wait_until": dec.wait_until.isoformat() if dec.wait_until else None,
         "required_heating_hours": dec.required_hours,
+        "energy_needed_kwh": dec.energy_kwh,
+        "estimated_cost_eur": dec.energy_cost_eur,
+        "electricity_price": d.electricity_price,
         "mode": d.mode,
         "pool_temp": d.pool_temp,
         "outdoor_temp": d.outdoor_temp,
@@ -60,6 +63,17 @@ def _status_attrs(d: PoolHeatingData) -> dict[str, Any]:
 def _heat_rate(d: PoolHeatingData) -> float:
     amb = d.outdoor_temp if d.outdoor_temp is not None else 20.0
     return round(d.model.heat_rate_at(amb), 3)
+
+
+def _prediction_attrs(d: PoolHeatingData) -> dict[str, Any]:
+    """Projected temperature trajectory for graphing (e.g. apexcharts-card)."""
+    return {
+        "target_temp": d.target_temp,
+        "forecast": [
+            {"datetime": when.isoformat(), "temperature": temp}
+            for when, temp in d.decision.trajectory
+        ],
+    }
 
 
 SENSORS: tuple[PoolSensorDescription, ...] = (
@@ -78,6 +92,7 @@ SENSORS: tuple[PoolSensorDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         icon="mdi:calendar-clock",
         value_fn=lambda d: d.decision.predicted_ready,
+        attrs_fn=_prediction_attrs,
     ),
     PoolSensorDescription(
         key="required_heating_hours",
@@ -149,6 +164,9 @@ class PoolHeatingSensor(PoolHeatingEntity, SensorEntity):
     """A sensor backed by a PoolSensorDescription value function."""
 
     entity_description: PoolSensorDescription
+    # The projected trajectory changes every tick and would bloat the
+    # recorder database — keep it out of recorded history.
+    _unrecorded_attributes = frozenset({"forecast"})
 
     def __init__(self, coordinator, entry, description: PoolSensorDescription) -> None:
         super().__init__(coordinator, entry, description.key)
@@ -176,16 +194,20 @@ class PoolEnergyConsumedSensor(PoolHeatingEntity, RestoreSensor):
 
     def __init__(self, coordinator, entry) -> None:
         super().__init__(coordinator, entry, "energy_consumed")
+        self._restored = 0.0
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         last = await self.async_get_last_sensor_data()
         if last and last.native_value is not None:
             try:
-                self.coordinator.seed_energy(float(last.native_value))
+                self._restored = float(last.native_value)
             except (TypeError, ValueError):
-                pass
+                return
+            self.coordinator.seed_energy(self._restored)
 
     @property
     def native_value(self) -> float:
-        return self.coordinator.data.energy_consumed_kwh
+        # coordinator.data may predate the restore seed; never report a dip —
+        # a TOTAL_INCREASING drop would register as a meter reset in statistics.
+        return max(self.coordinator.data.energy_consumed_kwh, self._restored)

@@ -25,6 +25,7 @@ class EngineOptions:
     rain_mm_threshold: float
     rain_lookahead_h: int
     price_policy: str
+    price_expensive_threshold: float
     catchup_deficit_c: float
     min_on_minutes: int
     min_off_minutes: int
@@ -90,6 +91,9 @@ def build_options(options: Mapping[str, Any]) -> EngineOptions:
         rain_mm_threshold=_f(g(c.CONF_RAIN_MM_THRESHOLD), c.DEFAULT_RAIN_MM_THRESHOLD),
         rain_lookahead_h=_i(g(c.CONF_RAIN_LOOKAHEAD_H), c.DEFAULT_RAIN_LOOKAHEAD_H),
         price_policy=str(g(c.CONF_PRICE_POLICY, c.DEFAULT_PRICE_POLICY)),
+        price_expensive_threshold=_f(
+            g(c.CONF_PRICE_EXPENSIVE_THRESHOLD), c.DEFAULT_PRICE_EXPENSIVE_THRESHOLD
+        ),
         catchup_deficit_c=_f(g(c.CONF_CATCHUP_DEFICIT_C), c.DEFAULT_CATCHUP_DEFICIT_C),
         min_on_minutes=_i(g(c.CONF_MIN_ON_MINUTES), c.DEFAULT_MIN_ON_MINUTES),
         min_off_minutes=_i(g(c.CONF_MIN_OFF_MINUTES), c.DEFAULT_MIN_OFF_MINUTES),

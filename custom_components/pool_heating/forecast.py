@@ -141,7 +141,12 @@ class NormalizedForecast:
 # Parsing / building
 # ---------------------------------------------------------------------------
 def _series(fields: dict | None, key: str) -> list[Pair]:
-    """Extract a sorted [(unix_ts, value|None)] series for a SHMU field."""
+    """Extract a sorted [(unix_ts, value|None)] series for a SHMU field.
+
+    Deterministic runs (ALADIN) have [ts, value] rows. Ensemble runs
+    (ECMWF ENS) have [ts, p10, p25, p50, p75, p90] percentile rows — take
+    the median column, not the lowest percentile.
+    """
     if not isinstance(fields, dict):
         return []
     node = fields.get(key)
@@ -154,7 +159,7 @@ def _series(fields: dict | None, key: str) -> list[Pair]:
     for entry in data:
         if not isinstance(entry, (list, tuple)) or len(entry) < 2:
             continue
-        ts_raw, val_raw = entry[0], entry[1]
+        ts_raw, val_raw = entry[0], entry[1 + (len(entry) - 2) // 2]
         try:
             ts = int(ts_raw)
         except (TypeError, ValueError):

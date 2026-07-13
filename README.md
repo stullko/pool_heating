@@ -57,18 +57,30 @@ Setup is done entirely through the UI config flow.
 **Required:** the pool water temperature sensor and the heat-pump switch.
 
 **Optional but recommended:** an outdoor temperature sensor, filtration
-(`switch`/`input_boolean`), an "expensive electricity" `binary_sensor`, a
-"daytime" `binary_sensor`, a `weather` entity, a **real-time rain-intensity
-sensor** (a hard "it's raining now" guard) and an **illuminance sensor** (a live
-solar proxy). The SHMÚ station defaults to `31479` — change it to the station
-nearest you. **Nothing is hard-coded**, so it works for any pool or location.
+(`switch`/`input_boolean`), an "expensive electricity" `binary_sensor` **or a
+real electricity-price sensor** (EUR/kWh — above the configurable threshold
+counts as expensive), a **heat-pump power sensor** (W or kW, e.g. a measuring
+smart plug — used for exact consumption tracking instead of the nominal
+rating), a "daytime" `binary_sensor`, a `weather` entity (used as the
+outdoor-temperature fallback when the dedicated sensor is missing or stale), a
+**real-time rain-intensity sensor** (a hard "it's raining now" guard) and an
+**illuminance sensor** (a live solar proxy — its recorded history is also used
+to *learn* your pool's solar gain). The SHMÚ station is validated during setup
+and defaults to `31479` — change it to the station nearest you. **Nothing is
+hard-coded** (the night/active windows follow your Home Assistant timezone), so
+it works for any pool or location.
 
 Every threshold can be changed later from the integration's **Configure**
 (options) dialog: target temperature, hysteresis, night/active window, minimum
-operating outdoor temperature, rain and cold thresholds, price policy, compressor
-minimum on/off times, rain-intensity threshold and the heat-pump power. Power
-defaults to **0.8 kW electrical / 5 kW thermal** (COP ≈ 6.25) — adjust it to your
-unit. COP is derived from thermal ÷ electrical unless you set it explicitly.
+operating outdoor temperature, rain and cold thresholds, price policy, the
+expensive-price threshold (EUR/kWh), compressor minimum on/off times,
+rain-intensity threshold and the heat-pump power. Power defaults to **0.8 kW
+electrical / 5 kW thermal** (COP ≈ 6.25) — adjust it to your unit. COP is
+derived from thermal ÷ electrical unless you set it explicitly.
+
+The learned thermal model (heat-loss, heat-up rate and solar gain) is
+**persisted** per entry, so it survives restarts and recorder purges; a fresh
+refit only replaces it when the new fit is at least comparably confident.
 
 ## Entities
 
@@ -77,14 +89,18 @@ your integration/device name):
 
 | Entity | Purpose |
 |---|---|
-| `sensor.pool_heating_status` | Decision state, plus a `reason` attribute (Slovak), predicted-ready time and model confidence |
+| `sensor.pool_heating_status` | Decision state, plus a `reason` attribute (Slovak), predicted-ready time, cost estimate, current price and model confidence |
 | `binary_sensor.pool_heating_should_heat` | Heating recommendation |
 | `select.pool_heating_mode` | `auto` / `off` / `force_on` override |
-| `sensor.pool_heating_predicted_ready` | Estimated time the pool reaches target |
+| `sensor.pool_heating_predicted_ready` | Estimated time the pool reaches target; its `forecast` attribute carries the projected hour-by-hour temperature trajectory for graphing |
 | `sensor.pool_heating_required_heating_hours`, `…_energy_needed` | Projections (energy = ON-hours × electrical kW) |
-| `sensor.pool_heating_power` | Live heat-pump power draw (W) |
-| `sensor.pool_heating_energy_consumed` | Cumulative consumed energy (kWh, Energy-dashboard ready) |
+| `sensor.pool_heating_power` | Live heat-pump power draw (measured sensor when configured, else nominal, W) |
+| `sensor.pool_heating_energy_consumed` | Cumulative consumed energy (kWh, Energy-dashboard ready; integrates the measured power when available) |
 | `sensor.pool_heating_heat_rate`, `…_loss_coefficient`, `…_model_confidence` | Learned model diagnostics |
+
+The status sensor also reports `compressor_protect` whenever the anti-short-
+cycle guard is holding the switch against the engine's wish, with the
+remaining minutes in the `reason`.
 
 ## Lovelace card
 
@@ -103,6 +119,11 @@ The example references the source entities `sensor.teplomer_bazen_temperature`
 `sensor.pracovna_teplota` (outdoor) and `sensor.night_state` — **replace these
 with your own entity IDs**.
 
+A second card, [`lovelace-prediction-card.yaml`](lovelace-prediction-card.yaml)
+(requires **apexcharts-card**), graphs the recorded water temperature together
+with the model's predicted trajectory from the `forecast` attribute of
+`sensor.<name>_predicted_ready`.
+
 ## Replacing an existing automation
 
 This integration replaces a reactive, `switch`-toggling automation. Once it is
@@ -116,8 +137,8 @@ fresh virtual environment:
 
 ```bash
 python -m venv .venv
-python -m pip install -r requirements_test.txt
-python -m pytest
+.venv/bin/python -m pip install -r requirements_test.txt
+.venv/bin/python -m pytest
 ```
 
 On native Windows, Home Assistant's test harness imports a few Unix-only runner
@@ -134,6 +155,21 @@ Remove-Item Env:PYTHONPATH
 
 The existing Windows `.venv` may contain an older Home Assistant test harness;
 recreate it before running the tests locally.
+
+### Live dry-run
+
+`scripts/live_check.py` answers *"could it heat right now, and is it worth
+it?"* against the **live SHMÚ forecast**, using the same decision engine as
+the integration — no Home Assistant required (just `aiohttp`):
+
+```bash
+.venv/bin/python scripts/live_check.py --pool 24.5 --price 0.25
+```
+
+It prints the current guard conditions, the net heating gain (°C/h), the
+energy needed per °C, the most efficient hour of the next 48 h and the
+engine's decision + reason for the given water temperature. Without `--pool`
+it sweeps a few representative water temperatures.
 
 ## How the decision works
 

@@ -18,6 +18,8 @@ CONF_DAY_ENTITY = "day_entity"
 CONF_WEATHER_ENTITY = "weather_entity"
 CONF_RAIN_INTENSITY_ENTITY = "rain_intensity_entity"
 CONF_ILLUMINANCE_ENTITY = "illuminance_entity"
+CONF_PRICE_ENTITY = "price_entity"
+CONF_POWER_ENTITY = "power_entity"
 CONF_SHMU_STATION = "shmu_station"
 
 # --- Options (tunable) keys -------------------------------------------------
@@ -33,6 +35,7 @@ CONF_COLD_LOOKAHEAD_DAYS = "cold_lookahead_days"
 CONF_RAIN_MM_THRESHOLD = "rain_mm_threshold"
 CONF_RAIN_LOOKAHEAD_H = "rain_lookahead_h"
 CONF_PRICE_POLICY = "price_policy"
+CONF_PRICE_EXPENSIVE_THRESHOLD = "price_expensive_threshold"
 CONF_CATCHUP_DEFICIT_C = "catchup_deficit_c"
 CONF_MIN_ON_MINUTES = "min_on_minutes"
 CONF_MIN_OFF_MINUTES = "min_off_minutes"
@@ -70,6 +73,7 @@ DEFAULT_HORIZON_DAYS = 10
 DEFAULT_RAIN_INTENSITY_THRESHOLD = 0.0
 DEFAULT_HEAT_PUMP_KW = 0.8          # electrical input power (kW)
 DEFAULT_HEAT_PUMP_THERMAL_KW = 5.0  # thermal output power (kW) -> COP ~6.25
+DEFAULT_PRICE_EXPENSIVE_THRESHOLD = 0.30  # EUR/kWh: above this counts as expensive
 FULL_SUN_LUX = 100000.0             # illuminance treated as full sun (solar proxy)
 
 # --- Price policy -----------------------------------------------------------
@@ -93,6 +97,7 @@ DEFAULT_MODE = MODE_AUTO
 # --- Coordinator cadences ---------------------------------------------------
 DECISION_INTERVAL = timedelta(minutes=5)
 FORECAST_REFRESH = timedelta(minutes=60)
+FORECAST_STALE = timedelta(hours=6)   # fail safe: stop trusting a forecast this old
 MODEL_REFIT = timedelta(hours=6)
 HISTORY_LOOKBACK_DAYS = 14
 SENSOR_MAX_AGE = timedelta(minutes=30)
@@ -105,7 +110,8 @@ R_MAX = 1.0            # degC/h  net heating cap
 K_PRIOR = 0.0083       # 1/h  ~ 120 h time constant
 R_PRIOR = 0.30         # degC/h
 SOLAR_PRIOR = 0.05     # degC/h at full sun
-LEARN_ALPHA = 0.10     # EMA blend for persisted learned coefficients
+SOLAR_MAX = 0.30       # degC/h cap for the learned solar gain
+MODEL_ADOPT_RATIO = 0.75  # adopt a fresh fit unless it is this much less confident
 N_OFF_TARGET = 30
 N_ON_TARGET = 20
 SPAN_OFF_MIN_H = 48.0
@@ -119,10 +125,6 @@ WATER_WH_PER_L_PER_C = 1.163   # Wh to raise 1 L of water by 1 degC
 
 # --- Decision / window tuning ----------------------------------------------
 G_MIN_C_PER_H = 0.05           # min net daytime gain to call an hour "productive"
-WINDOW_MIN_HOURS = 6
-WINDOW_MIN_GAIN_C = 1.0
-MAX_WAIT_DAYS = 5
-DECISION_DEBOUNCE_TICKS = 2
 
 # --- Status codes (state of sensor.<name>_status) ---------------------------
 STATUS_HEATING = "heating"
