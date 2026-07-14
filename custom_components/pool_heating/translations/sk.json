@@ -91,6 +91,7 @@
           "frost_protect": "Ochrana pred mrazom",
           "manual_override": "Manuálne ovládanie",
           "sensor_unavailable": "Snímač nedostupný",
+          "switch_unavailable": "Spínač nedostupný",
           "forecast_unavailable": "Predpoveď nedostupná",
           "compressor_protect": "Ochrana kompresora",
           "mode_off": "Vypnuté"

@@ -61,6 +61,7 @@ class NormalizedForecast:
     daily: list[DayAgg]
     current_temp: float | None
     next_rain_at: datetime | None
+    run_at: datetime | None = None  # when the NWP model run was produced
 
     # ---- lookups -----------------------------------------------------------
     def temp_at(self, when: datetime) -> float | None:
@@ -243,6 +244,27 @@ def _run_id(raw: dict | None) -> str:
     return ""
 
 
+def _run_time(raw: dict | None) -> datetime | None:
+    """Parse the model-run timestamp, e.g. '2026-06-01T06:00Z'."""
+    if not isinstance(raw, dict):
+        return None
+    value = raw.get("data_date_time")
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _newest_run_time(aladin: dict | None, ecmwf: dict | None) -> datetime | None:
+    times = [t for t in (_run_time(aladin), _run_time(ecmwf)) if t is not None]
+    return max(times) if times else None
+
+
 def build_normalized(
     aladin: dict | None,
     ecmwf: dict | None,
@@ -261,7 +283,10 @@ def build_normalized(
 
     if not temp:
         run_id = _run_id(aladin) or _run_id(ecmwf)
-        return NormalizedForecast(run_id, None, [], [], None, None)
+        return NormalizedForecast(
+            run_id, None, [], [], None, None,
+            run_at=_newest_run_time(aladin, ecmwf),
+        )
 
     start_hour = hour_floor_ts(temp[0][0])
     end_hour = hour_floor_ts(temp[-1][0])
@@ -299,6 +324,7 @@ def build_normalized(
         daily=daily,
         current_temp=current_temp,
         next_rain_at=next_rain_at,
+        run_at=_newest_run_time(aladin, ecmwf),
     )
 
 

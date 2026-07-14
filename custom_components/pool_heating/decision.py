@@ -115,21 +115,24 @@ def decide(inp: DecisionInputs) -> Decision:
                    f"Manuálny režim: rešpektujem ručné {state_sk}. Automatika pozastavená.",
                    "Manual override")
 
-    # 3. Filtration prerequisite (pump needs water flow) --------------------
-    if inp.filtration_configured and inp.filtration_on is None:
-        return out(False, c.ACTION_TURN_OFF, c.STATUS_WAITING_FILTRATION,
-                   "Nehrejem: stav filtrácie je nedostupný — bez overeného prúdenia "
-                   "vody čerpadlo nespúšťam.", "Filtration state unavailable")
+    # 3. Filtration explicitly off (pump needs water flow) ------------------
     if inp.filtration_on is False and not o.manage_filtration:
         return out(False, c.ACTION_TURN_OFF, c.STATUS_WAITING_FILTRATION,
                    "Nehrejem: filtrácia je vypnutá — čerpadlo potrebuje prúdenie vody.",
                    "Filtration off")
 
-    # 4. Frost protection (safety, overrides night) -------------------------
+    # 4. Frost protection (safety, overrides night and an *unknown*
+    #    filtration state — freezing damage outweighs a possible dry run) ---
     if o.frost_protect and pool <= o.frost_temp:
         return out(True, c.ACTION_TURN_ON, c.STATUS_FROST_PROTECT,
                    f"Hrejem (ochrana pred mrazom): voda {_t(pool)} °C.",
                    "Frost protection")
+
+    # 4b. Filtration state unknown (fail safe for normal operation) ---------
+    if inp.filtration_configured and inp.filtration_on is None:
+        return out(False, c.ACTION_TURN_OFF, c.STATUS_WAITING_FILTRATION,
+                   "Nehrejem: stav filtrácie je nedostupný — bez overeného prúdenia "
+                   "vody čerpadlo nespúšťam.", "Filtration state unavailable")
 
     # 5. Night / outside active window --------------------------------------
     if (

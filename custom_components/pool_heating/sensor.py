@@ -66,9 +66,10 @@ def _heat_rate(d: PoolHeatingData) -> float:
 
 
 def _prediction_attrs(d: PoolHeatingData) -> dict[str, Any]:
-    """Projected temperature trajectory for graphing (e.g. apexcharts-card)."""
+    """Projected temperature trajectory for graphing (bundled card, apexcharts)."""
     return {
         "target_temp": d.target_temp,
+        "pool_entity": d.pool_temp_entity,
         "forecast": [
             {"datetime": when.isoformat(), "temperature": temp}
             for when, temp in d.decision.trajectory

@@ -1,14 +1,14 @@
 {
   "domain": "pool_heating",
   "name": "Pool Heating Controller",
-  "after_dependencies": ["recorder"],
+  "after_dependencies": ["frontend", "recorder"],
   "codeowners": ["@stullko"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["http"],
   "documentation": "https://github.com/stullko/pool_heating",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/stullko/pool_heating/issues",
   "requirements": [],
-  "version": "0.2.0"
+  "version": "0.3.0"
 }

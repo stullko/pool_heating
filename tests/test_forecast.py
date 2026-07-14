@@ -25,6 +25,7 @@ def test_real_fixtures_normalize():
     now = datetime.fromtimestamp(first + 12 * 3600, timezone.utc)
     fc = F.build_normalized(aladin, ecmwf, now)
     assert fc.run_id
+    assert fc.run_at == datetime(2026, 6, 1, 6, 0, tzinfo=timezone.utc)
     assert len(fc.hourly) > 100
     assert len(fc.daily) >= 5
     assert any(h.source == "aladin" for h in fc.hourly)

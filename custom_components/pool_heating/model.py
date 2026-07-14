@@ -13,6 +13,7 @@ falls out of this — it is never hard-coded.
 
 from __future__ import annotations
 
+import bisect
 import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -20,12 +21,13 @@ from datetime import datetime, timedelta, timezone
 from . import const as c
 from .forecast import NormalizedForecast
 from .options import EngineOptions
-from .util import is_active_hour
+from .util import is_active_hour, parse_hhmm, to_local
 
 UTC = timezone.utc
 
 Sample = tuple[datetime, float]          # (time, pool temperature)
 Transition = tuple[datetime, bool]       # (time, switch is on)
+Prepared = tuple[list[float], list[float]]   # sorted (timestamps, values)
 
 
 # ---------------------------------------------------------------------------
@@ -96,8 +98,11 @@ def fit_thermo(
     if len(pts) < 3 or not ambient_series:
         return ThermoModel.default(options)
 
+    ambient = _prepare(ambient_series)
+    lux = _prepare(illuminance_series) if illuminance_series else None
+
     off_loss: list[float] = []
-    off_solar: list[float] = []
+    off_solar: list[float | None] = []
     off_rate: list[float] = []
     off_w: list[float] = []
     on_items: list[tuple[float, float, float, float, float]] = []  # amb, rate, loss, frac, weight
@@ -111,7 +116,7 @@ def fit_thermo(
         on1 = _switch_on_at(switch_transitions, t1)
         if on0 != on1 or _transition_between(switch_transitions, t0, t1):
             continue  # state not homogeneous across the pair
-        amb = _ambient_mean(ambient_series, t0, t1)
+        amb = _pair_mean(ambient, t0, t1)
         if amb is None:
             continue
         rate = (temp1 - temp0) / dt_h
@@ -119,10 +124,10 @@ def fit_thermo(
             continue  # sensor spike / impossible jump
         t_bar = (temp0 + temp1) / 2.0
         loss = amb - t_bar  # negative when pool warmer than air
-        frac = _solar_frac_mean(illuminance_series, t0, t1)
+        frac = _solar_frac_mean(lux, t0, t1)
         if on0:
             span_on += dt_h
-            on_items.append((amb, rate, loss, frac, dt_h))
+            on_items.append((amb, rate, loss, frac if frac is not None else 0.0, dt_h))
         else:
             if (t_bar - amb) < c.DT_MIN_GRADIENT_C:
                 continue  # too little signal to learn cooling
@@ -222,11 +227,14 @@ def project(
             amb = temp
         # losses (exact exponential over 1 h)
         temp = amb + (temp - amb) * math.exp(-model.k)
-        # solar gain during daytime
+        # solar gain during daytime: clear-sky fraction from cloud cover,
+        # shaped by a half-sine daylight profile so the applied fraction
+        # matches the lux basis the coefficient was learned against
+        # (a clear morning is far below full-sun lux).
         if is_active_hour(cur, options.active_start, options.active_end):
             cloud = forecast.cloud_at(cur)
-            solar_frac = max(0.0, 1.0 - cloud / 100.0) if cloud is not None else 0.0
-            temp += model.solar * solar_frac
+            clear = max(0.0, 1.0 - cloud / 100.0) if cloud is not None else 0.0
+            temp += model.solar * clear * _daylight_frac(cur, options)
         # heating, if this hour is allowed and we still need it
         if temp < target and _heat_allowed(cur, amb, forecast, options):
             temp += model.heat_rate_at(amb)
@@ -240,6 +248,26 @@ def project(
     # projected electrical consumption to reach target = run-hours x input power
     energy = round(heat_hours * options.heat_pump_kw, 2) if options.heat_pump_kw else None
     return Projection(ready, heat_hours, energy, traj)
+
+
+def _daylight_frac(cur: datetime, options: EngineOptions) -> float:
+    """Half-sine sun-height proxy over the active window (0 at edges, 1 mid).
+
+    The learned solar coefficient is calibrated against lux/FULL_SUN_LUX;
+    applying it at full strength for every clear daytime hour would
+    systematically overshoot the projection.
+    """
+    start = parse_hhmm(options.active_start)
+    end = parse_hhmm(options.active_end)
+    s = start.hour * 60 + start.minute
+    e = end.hour * 60 + end.minute
+    if e <= s:
+        return 1.0  # wrapping window: no meaningful profile
+    local = to_local(cur).time()
+    m = local.hour * 60 + local.minute
+    if not s <= m < e:
+        return 0.0
+    return math.sin(math.pi * (m - s) / (e - s))
 
 
 def _heat_allowed(
@@ -307,38 +335,78 @@ def _transition_between(transitions: list[Transition], t0: datetime, t1: datetim
     return any(t0 < t < t1 for t, _ in transitions)
 
 
-def _ambient_mean(series: list[Sample], t0: datetime, t1: datetime) -> float | None:
-    a = _interp_dt(series, t0)
-    b = _interp_dt(series, t1)
+def _prepare(series: list[Sample]) -> Prepared:
+    """Convert a sample series to sorted parallel (timestamp, value) arrays."""
+    pts = sorted(
+        ((t.timestamp(), float(v)) for t, v in series if _is_num(v)),
+        key=lambda e: e[0],
+    )
+    return [p[0] for p in pts], [p[1] for p in pts]
+
+
+def _interp_prepared(prep: Prepared, ts: float) -> float | None:
+    """O(log n) linear interpolation with hold-first/hold-last edges."""
+    ts_list, vals = prep
+    if not ts_list:
+        return None
+    if ts <= ts_list[0]:
+        return vals[0]
+    if ts >= ts_list[-1]:
+        return vals[-1]
+    i = bisect.bisect_right(ts_list, ts)
+    t0, t1 = ts_list[i - 1], ts_list[i]
+    if t1 == t0:
+        return vals[i - 1]
+    frac = (ts - t0) / (t1 - t0)
+    return vals[i - 1] + frac * (vals[i] - vals[i - 1])
+
+
+def _pair_mean(prep: Prepared, t0: datetime, t1: datetime) -> float | None:
+    a = _interp_prepared(prep, t0.timestamp())
+    b = _interp_prepared(prep, t1.timestamp())
     if a is None or b is None:
         return None
     return (a + b) / 2.0
 
 
 def _solar_frac_mean(
-    series: list[Sample] | None, t0: datetime, t1: datetime
-) -> float:
-    """Mean sun fraction 0..1 over a pair (lux / FULL_SUN_LUX); 0 if unknown."""
-    if not series:
-        return 0.0
-    lux = _ambient_mean(series, t0, t1)
+    prep: Prepared | None, t0: datetime, t1: datetime
+) -> float | None:
+    """Mean sun fraction 0..1 over a pair (lux / FULL_SUN_LUX).
+
+    Returns None when the pair lies (even partially) outside the recorded
+    illuminance history — edge-hold extrapolation would assign a single lux
+    value to whole days and poison the fit.
+    """
+    if prep is None or not prep[0]:
+        return None
+    ts_list, _ = prep
+    if t0.timestamp() < ts_list[0] or t1.timestamp() > ts_list[-1]:
+        return None
+    lux = _pair_mean(prep, t0, t1)
     if lux is None:
-        return 0.0
+        return None
     return _clamp(lux / c.FULL_SUN_LUX, 0.0, 1.0)
 
 
 def _fit_loss_and_solar(losses, fracs, rates, ws):
     """OFF-pair fit rate = k*loss + solar*frac.
 
-    Falls back to the 1-var Newton fit when there is no usable illuminance
-    signal (all fractions ~0) or the system is degenerate.
+    `fracs` entries may be None (pair outside lux coverage). The 2-var fit
+    only runs when enough pairs are covered (SOLAR_COVERAGE_MIN) and a real
+    sun signal exists; otherwise it falls back to the 1-var Newton fit.
     Returns (k, solar|None, r2).
     """
     if len(losses) < 3:
         return None, None, 0.0
-    if not any(f > 0.05 for f in fracs):
+    known = [f for f in fracs if f is not None]
+    if (
+        len(known) < c.SOLAR_COVERAGE_MIN * len(fracs)
+        or not any(f > 0.05 for f in known)
+    ):
         k, r2 = _wls_origin(losses, rates, ws)
         return k, None, r2
+    fracs = [f if f is not None else 0.0 for f in fracs]
     s11 = sum(w * x * x for x, w in zip(losses, ws))
     s22 = sum(w * f * f for f, w in zip(fracs, ws))
     s12 = sum(w * x * f for x, f, w in zip(losses, fracs, ws))
@@ -359,25 +427,6 @@ def _fit_loss_and_solar(losses, fracs, rates, ws):
     ss_tot = sum(w * (y - ybar) ** 2 for y, w in zip(rates, ws))
     r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
     return k, solar, r2
-
-
-def _interp_dt(series: list[Sample], when: datetime) -> float | None:
-    if not series:
-        return None
-    ts = when.timestamp()
-    pts = [(t.timestamp(), v) for t, v in series]
-    if ts <= pts[0][0]:
-        return pts[0][1]
-    if ts >= pts[-1][0]:
-        return pts[-1][1]
-    for i in range(len(pts) - 1):
-        t0, v0 = pts[i]
-        t1, v1 = pts[i + 1]
-        if t0 <= ts <= t1:
-            if t1 == t0:
-                return v0
-            return v0 + (ts - t0) / (t1 - t0) * (v1 - v0)
-    return pts[-1][1]
 
 
 def _wls_origin(xs, ys, ws):

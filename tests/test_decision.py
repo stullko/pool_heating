@@ -104,6 +104,21 @@ def test_filtration_unavailable_fails_safe():
     assert d.should_heat is False
 
 
+def test_frost_protect_survives_unavailable_filtration():
+    opts = build_options({C.CONF_FROST_PROTECT: True})
+    d = _decide(pool_temp=2.0, options=opts,
+                filtration_on=None, filtration_configured=True)
+    assert d.status == C.STATUS_FROST_PROTECT
+    assert d.should_heat is True
+
+
+def test_frost_protect_blocked_by_explicitly_off_filtration():
+    opts = build_options({C.CONF_FROST_PROTECT: True})
+    d = _decide(pool_temp=2.0, options=opts,
+                filtration_on=False, filtration_configured=True)
+    assert d.status == C.STATUS_WAITING_FILTRATION
+
+
 def test_outdoor_too_cold_now():
     assert _decide(pool_temp=24.0, outdoor_temp=12.0).status == C.STATUS_WAITING_COLD_NOW
 

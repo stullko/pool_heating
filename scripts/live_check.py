@@ -133,7 +133,7 @@ def _profitability_report(
     kw = opts.heat_pump_kw or 0.0
     if gain_now > 0:
         kwh_per_deg = kw / gain_now
-        cost = f" (~{kwh_per_deg * price:.2f} EUR/°C)" if price else ""
+        cost = f" (~{kwh_per_deg * price:.2f} EUR/°C)" if price is not None else ""
         print(f"  Čistý zisk teraz: {gain_now:.2f} °C/h  ->  "
               f"{kwh_per_deg:.1f} kWh na 1 °C{cost}")
     else:
@@ -177,7 +177,7 @@ def _decision_report(
         ))
         verdict = "HREJEM" if d.should_heat else "NEHREJEM"
         cost = ""
-        if price and d.energy_kwh:
+        if price is not None and d.energy_kwh is not None:
             cost = f", ~{d.energy_kwh * price:.2f} EUR"
         extras = (f"dohriatie {dt_sk(d.predicted_ready)}, "
                   f"{_fmt(d.required_hours, ' h', 1)} chodu, "

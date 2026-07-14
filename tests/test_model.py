@@ -74,6 +74,27 @@ def test_solar_gain_recovered_from_illuminance():
     assert m.solar > C.SOLAR_PRIOR  # learned, not the prior
 
 
+def test_partial_lux_coverage_does_not_poison_fit():
+    """A lux sensor added late must not smear edge values over old pairs."""
+    amb, k = 15.0, 0.02
+    pool, ambient, lux = [], [], []
+    temp = 30.0
+    for i in range(240):
+        t = START + timedelta(hours=i)
+        pool.append((t, round(temp, 3)))
+        ambient.append((t, amb))
+        if i >= 192:  # lux history exists only for the last 2 days
+            frac = 0.8 if 10 <= (i % 24) <= 16 else 0.0
+            lux.append((t, frac * C.FULL_SUN_LUX))
+        temp = amb + (temp - amb) * math.exp(-k)
+    m = M.fit_thermo(
+        pool, [(START, False)], ambient, OPTS,
+        START + timedelta(hours=240), illuminance_series=lux,
+    )
+    assert m.solar == C.SOLAR_PRIOR  # 2-var fit must NOT engage
+    assert abs(m.k - k) < 0.006
+
+
 def test_no_illuminance_keeps_solar_prior():
     amb, k = 15.0, 0.02
     pool, ambient = [], []

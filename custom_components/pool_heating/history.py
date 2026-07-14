@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+from functools import partial
 
 from homeassistant.components.recorder import get_instance, history
 from homeassistant.core import HomeAssistant
@@ -56,7 +57,12 @@ class HistoryReader:
         illuminance = (
             _to_samples(states.get(self._illuminance, [])) if self._illuminance else None
         )
-        return fit_thermo(pool, switch, outdoor, options, illuminance_series=illuminance)
+        # The fit is pure CPU over potentially tens of thousands of samples —
+        # keep it off the event loop.
+        return await self._hass.async_add_executor_job(
+            partial(fit_thermo, pool, switch, outdoor, options,
+                    illuminance_series=illuminance)
+        )
 
     def _load(self, start: datetime, entity_ids: list[str]) -> dict:
         """Blocking — runs in the recorder DB executor thread."""

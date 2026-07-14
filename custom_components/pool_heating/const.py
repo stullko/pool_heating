@@ -7,6 +7,11 @@ from datetime import timedelta
 DOMAIN = "pool_heating"
 PLATFORMS = ["sensor", "binary_sensor", "select"]
 
+# --- Bundled frontend card ---------------------------------------------------
+FRONTEND_URL = "/pool_heating_files/pool-heating-card.js"
+FRONTEND_VERSION = "0.3.0"   # bump with manifest version (cache busting)
+DATA_FRONTEND = "pool_heating_frontend_registered"
+
 # --- Config (setup) keys ----------------------------------------------------
 CONF_NAME = "name"
 CONF_POOL_TEMP_ENTITY = "pool_temp_entity"
@@ -97,10 +102,12 @@ DEFAULT_MODE = MODE_AUTO
 # --- Coordinator cadences ---------------------------------------------------
 DECISION_INTERVAL = timedelta(minutes=5)
 FORECAST_REFRESH = timedelta(minutes=60)
-FORECAST_STALE = timedelta(hours=6)   # fail safe: stop trusting a forecast this old
+FORECAST_STALE = timedelta(hours=6)      # fail safe: last successful fetch this old
+FORECAST_RUN_STALE = timedelta(hours=24)  # fail safe: model run itself this old
 MODEL_REFIT = timedelta(hours=6)
 HISTORY_LOOKBACK_DAYS = 14
 SENSOR_MAX_AGE = timedelta(minutes=30)
+PRICE_MAX_AGE = timedelta(hours=2)   # price sensors typically update hourly
 
 # --- Thermal model priors / bounds ------------------------------------------
 K_MIN = 0.002          # 1/h  (slowest cooling, tau ~ 500 h)
@@ -111,6 +118,7 @@ K_PRIOR = 0.0083       # 1/h  ~ 120 h time constant
 R_PRIOR = 0.30         # degC/h
 SOLAR_PRIOR = 0.05     # degC/h at full sun
 SOLAR_MAX = 0.30       # degC/h cap for the learned solar gain
+SOLAR_COVERAGE_MIN = 0.8  # min share of OFF pairs inside lux history for 2-var fit
 MODEL_ADOPT_RATIO = 0.75  # adopt a fresh fit unless it is this much less confident
 N_OFF_TARGET = 30
 N_ON_TARGET = 20
@@ -141,6 +149,7 @@ STATUS_NO_WINDOW = "no_window"
 STATUS_FROST_PROTECT = "frost_protect"
 STATUS_MANUAL_OVERRIDE = "manual_override"
 STATUS_SENSOR_UNAVAILABLE = "sensor_unavailable"
+STATUS_SWITCH_UNAVAILABLE = "switch_unavailable"
 STATUS_FORECAST_UNAVAILABLE = "forecast_unavailable"
 STATUS_COMPRESSOR_PROTECT = "compressor_protect"
 STATUS_MODE_OFF = "mode_off"
@@ -160,6 +169,7 @@ ALL_STATUSES = [
     STATUS_FROST_PROTECT,
     STATUS_MANUAL_OVERRIDE,
     STATUS_SENSOR_UNAVAILABLE,
+    STATUS_SWITCH_UNAVAILABLE,
     STATUS_FORECAST_UNAVAILABLE,
     STATUS_COMPRESSOR_PROTECT,
     STATUS_MODE_OFF,

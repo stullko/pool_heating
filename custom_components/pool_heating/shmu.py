@@ -53,14 +53,15 @@ class ShmuClient:
         aladin_link = self._first_of_type(products, "aladin")
         ecmwf_link = self._first_of_type(products, "ecmwf")
 
+        # Drop superseded runs BEFORE fetching — pruning after would let the
+        # cache grow without bound while one model's fetch keeps failing.
+        current = {aladin_link, ecmwf_link}
+        self._cache = {k: v for k, v in self._cache.items() if k in current}
+
         aladin = await self._get_run(aladin_link) if aladin_link else None
         ecmwf = await self._get_run(ecmwf_link) if ecmwf_link else None
         if aladin is None and ecmwf is None:
             raise ShmuError("no ALADIN or ECMWF product available for station")
-
-        # Drop superseded runs; keep only the links that are still current.
-        current = {aladin_link, ecmwf_link}
-        self._cache = {k: v for k, v in self._cache.items() if k in current}
 
         return build_normalized(aladin, ecmwf, datetime.now(UTC))
 

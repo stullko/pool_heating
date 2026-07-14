@@ -91,6 +91,7 @@
           "frost_protect": "Frost protection",
           "manual_override": "Manual override",
           "sensor_unavailable": "Sensor unavailable",
+          "switch_unavailable": "Switch unavailable",
           "forecast_unavailable": "Forecast unavailable",
           "compressor_protect": "Compressor protection",
           "mode_off": "Off"

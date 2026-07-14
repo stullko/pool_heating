@@ -69,6 +69,23 @@ async def test_two_pools_may_share_a_station(hass, enable_custom_integrations):
     assert result2["type"] == FlowResultType.CREATE_ENTRY
 
 
+async def test_same_switch_in_legacy_entry_aborts(hass, enable_custom_integrations):
+    """Entries created before 0.2.0 still carry a station-based unique_id."""
+    MockConfigEntry(
+        domain=C.DOMAIN,
+        unique_id="31479",
+        data={C.CONF_HEAT_PUMP_SWITCH: "switch.hp"},
+    ).add_to_hass(hass)
+    result = await hass.config_entries.flow.async_init(
+        C.DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    with patch(_VALIDATE, return_value=None):
+        result2 = await hass.config_entries.flow.async_configure(
+            result["flow_id"], _BASE_INPUT
+        )
+    assert result2["type"] == FlowResultType.ABORT
+
+
 async def test_unusable_station_shows_field_error(hass, enable_custom_integrations):
     result = await hass.config_entries.flow.async_init(
         C.DOMAIN, context={"source": config_entries.SOURCE_USER}

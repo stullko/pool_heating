@@ -64,8 +64,15 @@ class PoolHeatingConfigFlow(ConfigFlow, domain=c.DOMAIN):
             error = await self._async_validate_station(station)
             if error is None:
                 # One entry per controlled heat pump; the SHMU station may be
-                # shared by several pools.
-                await self.async_set_unique_id(user_input[c.CONF_HEAT_PUMP_SWITCH])
+                # shared by several pools. Scan entry data too — entries
+                # created before 0.2.0 may still carry a station unique_id.
+                switch = user_input[c.CONF_HEAT_PUMP_SWITCH]
+                if any(
+                    e.data.get(c.CONF_HEAT_PUMP_SWITCH) == switch
+                    for e in self._async_current_entries()
+                ):
+                    return self.async_abort(reason="already_configured")
+                await self.async_set_unique_id(switch)
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
                     title=user_input.get(c.CONF_NAME, c.DEFAULT_NAME), data=user_input

@@ -59,6 +59,7 @@ class PoolHeatingData:
     rain_intensity: float | None
     illuminance: float | None
     electricity_price: float | None
+    pool_temp_entity: str | None
 
 
 class PoolHeatingCoordinator(DataUpdateCoordinator[PoolHeatingData]):
@@ -117,14 +118,19 @@ class PoolHeatingCoordinator(DataUpdateCoordinator[PoolHeatingData]):
         now = dt_util.utcnow()
 
         await self._maybe_refresh_forecast(now)
-        if (
-            self._forecast is not None
-            and self._forecast_at is not None
-            and now - self._forecast_at > c.FORECAST_STALE
+        if self._forecast is not None and (
+            # network dead: nothing fetched successfully for too long
+            (self._forecast_at is not None and now - self._forecast_at > c.FORECAST_STALE)
+            # upstream dead: fetches succeed but SHMU keeps serving an old run
+            or (
+                self._forecast.run_at is not None
+                and now - self._forecast.run_at > c.FORECAST_RUN_STALE
+            )
         ):
             _LOGGER.warning(
-                "SHMU forecast run %s is older than %s, treating as unavailable",
-                self._forecast.run_id, c.FORECAST_STALE,
+                "SHMU forecast run %s is stale (fetched %s, run %s), "
+                "treating as unavailable",
+                self._forecast.run_id, self._forecast_at, self._forecast.run_at,
             )
             self._forecast = None
             self._forecast_at = None
@@ -154,7 +160,7 @@ class PoolHeatingCoordinator(DataUpdateCoordinator[PoolHeatingData]):
         # Expensive electricity: real price sensor (over threshold) OR the
         # legacy binary sensor — either signal marks the hour as expensive.
         expensive = self._read_onoff(self._cfg.get(c.CONF_ELECTRICITY_EXPENSIVE_ENTITY))
-        price = self._read_float(self._cfg.get(c.CONF_PRICE_ENTITY))
+        price = self._read_float(self._cfg.get(c.CONF_PRICE_ENTITY), c.PRICE_MAX_AGE)
         if price is not None:
             over = price > self._options.price_expensive_threshold
             expensive = over if expensive is None else (expensive or over)
@@ -221,6 +227,7 @@ class PoolHeatingCoordinator(DataUpdateCoordinator[PoolHeatingData]):
             rain_intensity=rain_intensity,
             illuminance=illuminance,
             electricity_price=price,
+            pool_temp_entity=self._cfg.get(c.CONF_POOL_TEMP_ENTITY),
         )
 
     async def _maybe_refresh_forecast(self, now: datetime) -> None:
@@ -288,8 +295,12 @@ class PoolHeatingCoordinator(DataUpdateCoordinator[PoolHeatingData]):
         state = self.hass.states.get(entity_id)
         if state is None or state.state in _INVALID:
             return None
-        if max_age is not None and (dt_util.utcnow() - state.last_updated) > max_age:
-            return None
+        if max_age is not None:
+            # last_reported refreshes even when an integration re-writes the
+            # same value; last_updated would flag steady sensors as stale.
+            reported = getattr(state, "last_reported", None) or state.last_updated
+            if (dt_util.utcnow() - reported) > max_age:
+                return None
         try:
             return float(state.state)
         except (TypeError, ValueError):

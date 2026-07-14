@@ -37,6 +37,7 @@ cards:
         'compressor_protect': 'grey',
         'manual_override': 'purple',
         'sensor_unavailable': 'red',
+        'switch_unavailable': 'red',
         'forecast_unavailable': 'orange'
       }.get(status, 'grey') }}
     badge_icon: >-

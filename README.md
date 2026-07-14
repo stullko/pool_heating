@@ -102,9 +102,29 @@ The status sensor also reports `compressor_protect` whenever the anti-short-
 cycle guard is holding the switch against the engine's wish, with the
 remaining minutes in the `reason`.
 
-## Lovelace card
+## Dashboard card (built-in, no dependencies)
 
-A ready-to-paste **Mushroom-style** dashboard card is provided in
+The integration **bundles its own Lovelace card** and registers it
+automatically — no HACS frontend cards needed. Add it via
+**Dashboard → Edit → Add card** and search for **Pool Heating Card**, or in
+YAML:
+
+```yaml
+type: custom:pool-heating-card
+entity: sensor.pool_heating_status   # your status sensor
+```
+
+It shows the colour-coded status with the Slovak reason, chips (water/target
+and outdoor temperature, predicted-ready time, power, consumed energy, cost
+estimate, model confidence), tap-to-switch mode buttons (auto / off / force)
+and a 24 h history + multi-day prediction graph with the target line. All
+sibling entities are derived from the status sensor id; override them with
+`predicted_ready_entity`, `mode_entity`, `power_entity`, `energy_entity`, or
+set `hide_graph: true` and `name`.
+
+## Optional YAML cards (Mushroom / apexcharts)
+
+A Mushroom-style dashboard card is also provided in
 [`lovelace-card.yaml`](lovelace-card.yaml). It requires the HACS frontend cards
 **Mushroom**, **mini-graph-card** and **stack-in-card**. Add it via
 **Dashboard → Edit → Add card → Manual** and paste the file's contents.
