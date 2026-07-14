@@ -19,6 +19,25 @@
           "illuminance_entity": "Senzor osvetlenia (voliteľné, proxy slnka)",
           "shmu_station": "ID stanice SHMÚ"
         }
+      },
+      "reconfigure": {
+        "title": "Riadenie ohrevu bazéna",
+        "description": "Zmeň entity, ktoré regulátor číta, a spínač tepelného čerpadla, ktorý ovláda. Prázdne voliteľné pole sa odstráni.",
+        "data": {
+          "name": "Názov",
+          "pool_temp_entity": "Snímač teploty vody v bazéne",
+          "heat_pump_switch": "Spínač tepelného čerpadla",
+          "outdoor_temp_entity": "Snímač vonkajšej teploty (voliteľné)",
+          "filtration_entity": "Filtrácia bazéna (voliteľné, podmienka ohrevu)",
+          "electricity_expensive_entity": "Binárny senzor drahej elektriny (voliteľné)",
+          "price_entity": "Senzor ceny elektriny (voliteľné, EUR/kWh)",
+          "power_entity": "Senzor príkonu tepelného čerpadla (voliteľné, W alebo kW)",
+          "day_entity": "Binárny senzor dňa (voliteľné)",
+          "weather_entity": "Entita počasia (voliteľné, záložná vonkajšia teplota)",
+          "rain_intensity_entity": "Senzor intenzity dažďa (voliteľné, naživo)",
+          "illuminance_entity": "Senzor osvetlenia (voliteľné, proxy slnka)",
+          "shmu_station": "ID stanice SHMÚ"
+        }
       }
     },
     "error": {
@@ -26,7 +45,8 @@
       "invalid_station": "Táto stanica SHMÚ nezverejňuje predpoveď ALADIN/ECMWF — skús iné ID stanice."
     },
     "abort": {
-      "already_configured": "Tento spínač tepelného čerpadla už spravuje iná konfigurácia."
+      "already_configured": "Tento spínač tepelného čerpadla už spravuje iná konfigurácia.",
+      "reconfigure_successful": "Konfigurácia bola aktualizovaná."
     }
   },
   "options": {

@@ -78,6 +78,15 @@ rain-intensity threshold and the heat-pump power. Power defaults to **0.8 kW
 electrical / 5 kW thermal** (COP ≈ 6.25) — adjust it to your unit. COP is
 derived from thermal ÷ electrical unless you set it explicitly.
 
+The **wiring** — the pool temperature sensor, the heat-pump switch and every
+optional entity — can be changed later too, without deleting the entry (the
+learned thermal model survives): open **Settings → Devices & services →
+Pool Heating Controller**, click the three-dot menu on the entry and choose
+**Reconfigure**. This is the fix when the status is stuck on *Sensor
+unavailable* because the configured water-temperature sensor no longer exists
+or was renamed. Leaving an optional field empty removes that entity from the
+configuration.
+
 The learned thermal model (heat-loss, heat-up rate and solar gain) is
 **persisted** per entry, so it survives restarts and recorder purges; a fresh
 refit only replaces it when the new fit is at least comparably confident.

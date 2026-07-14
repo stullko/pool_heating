@@ -19,6 +19,25 @@
           "illuminance_entity": "Illuminance sensor (optional, solar proxy)",
           "shmu_station": "SHMU station id"
         }
+      },
+      "reconfigure": {
+        "title": "Pool Heating Controller",
+        "description": "Change the entities this controller reads and the heat-pump switch it controls. Leaving an optional field empty removes it.",
+        "data": {
+          "name": "Name",
+          "pool_temp_entity": "Pool water temperature sensor",
+          "heat_pump_switch": "Heat pump switch",
+          "outdoor_temp_entity": "Outdoor temperature sensor (optional)",
+          "filtration_entity": "Pool filtration (optional, prerequisite for heating)",
+          "electricity_expensive_entity": "Expensive-electricity binary sensor (optional)",
+          "price_entity": "Electricity price sensor (optional, EUR/kWh)",
+          "power_entity": "Heat-pump power sensor (optional, W or kW)",
+          "day_entity": "Daytime binary sensor (optional)",
+          "weather_entity": "Weather entity (optional, outdoor-temperature fallback)",
+          "rain_intensity_entity": "Rain intensity sensor (optional, real-time)",
+          "illuminance_entity": "Illuminance sensor (optional, solar proxy)",
+          "shmu_station": "SHMU station id"
+        }
       }
     },
     "error": {
@@ -26,7 +45,8 @@
       "invalid_station": "This SHMU station publishes no ALADIN/ECMWF forecast — try a different station id."
     },
     "abort": {
-      "already_configured": "This heat-pump switch is already managed by another entry."
+      "already_configured": "This heat-pump switch is already managed by another entry.",
+      "reconfigure_successful": "Configuration updated."
     }
   },
   "options": {

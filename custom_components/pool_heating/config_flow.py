@@ -39,6 +39,29 @@ def _num(lo, hi, step, unit=None) -> NumberSelector:
     return NumberSelector(config)
 
 
+def _wiring_schema() -> vol.Schema:
+    """Identity + wiring fields, shared by initial setup and reconfigure."""
+    return vol.Schema(
+        {
+            vol.Required(c.CONF_NAME, default=c.DEFAULT_NAME): str,
+            vol.Required(c.CONF_POOL_TEMP_ENTITY): _entity("sensor"),
+            vol.Required(c.CONF_HEAT_PUMP_SWITCH): _entity("switch"),
+            vol.Optional(c.CONF_OUTDOOR_TEMP_ENTITY): _entity("sensor"),
+            vol.Optional(c.CONF_FILTRATION_ENTITY): _entity(["input_boolean", "switch"]),
+            vol.Optional(c.CONF_ELECTRICITY_EXPENSIVE_ENTITY): _entity("binary_sensor"),
+            vol.Optional(c.CONF_PRICE_ENTITY): _entity("sensor"),
+            vol.Optional(c.CONF_POWER_ENTITY): _entity("sensor"),
+            vol.Optional(c.CONF_DAY_ENTITY): _entity("binary_sensor"),
+            vol.Optional(c.CONF_WEATHER_ENTITY): _entity("weather"),
+            vol.Optional(c.CONF_RAIN_INTENSITY_ENTITY): _entity("sensor"),
+            vol.Optional(c.CONF_ILLUMINANCE_ENTITY): _entity("sensor"),
+            vol.Required(c.CONF_SHMU_STATION, default=c.DEFAULT_SHMU_STATION): _num(
+                1, 99999, 1
+            ),
+        }
+    )
+
+
 class PoolHeatingConfigFlow(ConfigFlow, domain=c.DOMAIN):
     """Initial setup: identity + wiring."""
 
@@ -79,28 +102,45 @@ class PoolHeatingConfigFlow(ConfigFlow, domain=c.DOMAIN):
                 )
             errors[c.CONF_SHMU_STATION] = error
 
-        schema = vol.Schema(
-            {
-                vol.Required(c.CONF_NAME, default=c.DEFAULT_NAME): str,
-                vol.Required(c.CONF_POOL_TEMP_ENTITY): _entity("sensor"),
-                vol.Required(c.CONF_HEAT_PUMP_SWITCH): _entity("switch"),
-                vol.Optional(c.CONF_OUTDOOR_TEMP_ENTITY): _entity("sensor"),
-                vol.Optional(c.CONF_FILTRATION_ENTITY): _entity(["input_boolean", "switch"]),
-                vol.Optional(c.CONF_ELECTRICITY_EXPENSIVE_ENTITY): _entity("binary_sensor"),
-                vol.Optional(c.CONF_PRICE_ENTITY): _entity("sensor"),
-                vol.Optional(c.CONF_POWER_ENTITY): _entity("sensor"),
-                vol.Optional(c.CONF_DAY_ENTITY): _entity("binary_sensor"),
-                vol.Optional(c.CONF_WEATHER_ENTITY): _entity("weather"),
-                vol.Optional(c.CONF_RAIN_INTENSITY_ENTITY): _entity("sensor"),
-                vol.Optional(c.CONF_ILLUMINANCE_ENTITY): _entity("sensor"),
-                vol.Required(c.CONF_SHMU_STATION, default=c.DEFAULT_SHMU_STATION): _num(
-                    1, 99999, 1
-                ),
-            }
-        )
+        schema = _wiring_schema()
         if user_input is not None:
             schema = self.add_suggested_values_to_schema(schema, user_input)
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None):
+        """Rewire an existing entry (sensors, switch, station) without re-adding it.
+
+        Replaces the entry data wholesale — a cleared optional selector must
+        drop the key, which data_updates' merge semantics would keep forever.
+        """
+        errors: dict[str, str] = {}
+        entry = self._get_reconfigure_entry()
+        if user_input is not None:
+            station = int(user_input[c.CONF_SHMU_STATION])
+            user_input[c.CONF_SHMU_STATION] = station
+            error = await self._async_validate_station(station)
+            if error is None:
+                switch = user_input[c.CONF_HEAT_PUMP_SWITCH]
+                if any(
+                    e.entry_id != entry.entry_id
+                    and switch in (e.unique_id, e.data.get(c.CONF_HEAT_PUMP_SWITCH))
+                    for e in self._async_current_entries()
+                ):
+                    return self.async_abort(reason="already_configured")
+                return self.async_update_reload_and_abort(
+                    entry,
+                    unique_id=switch,
+                    title=user_input.get(c.CONF_NAME, entry.title),
+                    data=user_input,
+                )
+            errors[c.CONF_SHMU_STATION] = error
+
+        schema = self.add_suggested_values_to_schema(
+            _wiring_schema(), user_input if user_input is not None else entry.data
+        )
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=schema, errors=errors
+        )
 
     @staticmethod
     @callback
