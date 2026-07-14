@@ -56,6 +56,7 @@
         "data": {
           "target_temp": "Target temperature",
           "hysteresis": "Hysteresis",
+          "pool_temp_max_age_minutes": "Water reading max age (minutes)",
           "night_start": "Night start",
           "night_end": "Night end",
           "active_start": "Active window start",

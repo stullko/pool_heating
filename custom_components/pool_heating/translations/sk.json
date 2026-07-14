@@ -56,6 +56,7 @@
         "data": {
           "target_temp": "Cieľová teplota",
           "hysteresis": "Hysteréza",
+          "pool_temp_max_age_minutes": "Max. vek údaja o teplote vody (min)",
           "night_start": "Začiatok noci",
           "night_end": "Koniec noci",
           "active_start": "Začiatok denného okna",

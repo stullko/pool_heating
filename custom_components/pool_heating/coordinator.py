@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -99,6 +99,7 @@ class PoolHeatingCoordinator(DataUpdateCoordinator[PoolHeatingData]):
         self._store: Store[dict] = Store(hass, STORAGE_VERSION, storage_key(entry.entry_id))
         self._stored_model: ThermoModel | None = None
         self._store_loaded = False
+        self._pool_temp_cache: tuple[datetime, float] | None = None
 
     # ---- mode override (set by the select entity) -------------------------
     @property
@@ -137,7 +138,7 @@ class PoolHeatingCoordinator(DataUpdateCoordinator[PoolHeatingData]):
         await self._maybe_refit_model(now)
         model = self._model or ThermoModel.default(self._options)
 
-        pool = self._read_float(self._cfg.get(c.CONF_POOL_TEMP_ENTITY), c.SENSOR_MAX_AGE)
+        pool = self._read_pool_temp()
         outdoor = self._read_float(
             self._cfg.get(c.CONF_OUTDOOR_TEMP_ENTITY), c.SENSOR_MAX_AGE
         )
@@ -289,6 +290,38 @@ class PoolHeatingCoordinator(DataUpdateCoordinator[PoolHeatingData]):
             _LOGGER.debug("Could not load persisted thermal model: %s", err)
 
     # ---- state helpers ----------------------------------------------------
+    def _read_pool_temp(self) -> float | None:
+        """Newest valid water reading, tolerated up to the configured max age.
+
+        Battery pool thermometers report sparsely and often flap to
+        unavailable between broadcasts; a hard per-tick freshness check kept
+        flipping the controller into sensor_unavailable even though the
+        water — with a time constant of tens of hours — had barely moved.
+        Remember the last valid reading and only fail safe once it is
+        genuinely too old.
+        """
+        entity_id = self._cfg.get(c.CONF_POOL_TEMP_ENTITY)
+        if not entity_id:
+            return None
+        state = self.hass.states.get(entity_id)
+        if state is not None and state.state not in _INVALID:
+            try:
+                value = float(state.state)
+            except (TypeError, ValueError):
+                value = None
+            if value is not None:
+                # last_reported refreshes even when an integration re-writes
+                # the same value; last_updated would flag steady sensors stale.
+                reported = getattr(state, "last_reported", None) or state.last_updated
+                self._pool_temp_cache = (reported, value)
+        if self._pool_temp_cache is None:
+            return None
+        reported, value = self._pool_temp_cache
+        max_age = timedelta(minutes=self._options.pool_temp_max_age_minutes)
+        if dt_util.utcnow() - reported > max_age:
+            return None
+        return value
+
     def _read_float(self, entity_id: str | None, max_age=None) -> float | None:
         if not entity_id:
             return None

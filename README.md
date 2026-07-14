@@ -78,6 +78,12 @@ rain-intensity threshold and the heat-pump power. Power defaults to **0.8 kW
 electrical / 5 kW thermal** (COP ≈ 6.25) — adjust it to your unit. COP is
 derived from thermal ÷ electrical unless you set it explicitly.
 
+Battery pool thermometers often report sparsely (or drop to *unavailable*
+between broadcasts). The controller keeps the last valid water reading and
+only fails safe to *Sensor unavailable* once it is older than **Water reading
+max age** (default 120 minutes — water temperature barely moves in that time).
+Tune it down for a fast wired probe or up for a very quiet thermometer.
+
 The **wiring** — the pool temperature sensor, the heat-pump switch and every
 optional entity — can be changed later too, without deleting the entry (the
 learned thermal model survives): open **Settings → Devices & services →

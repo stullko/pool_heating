@@ -38,6 +38,7 @@ class EngineOptions:
     heat_pump_kw: float | None
     heat_pump_thermal_kw: float | None
     cop: float | None
+    pool_temp_max_age_minutes: int = c.DEFAULT_POOL_TEMP_MAX_AGE
 
     def effective_cop(self) -> float | None:
         """COP override, else thermal/electrical, else None."""
@@ -108,4 +109,7 @@ def build_options(options: Mapping[str, Any]) -> EngineOptions:
         heat_pump_kw=_f(g(c.CONF_HEAT_PUMP_KW), c.DEFAULT_HEAT_PUMP_KW),
         heat_pump_thermal_kw=_f(g(c.CONF_HEAT_PUMP_THERMAL_KW), c.DEFAULT_HEAT_PUMP_THERMAL_KW),
         cop=_opt_f(g(c.CONF_COP)),
+        pool_temp_max_age_minutes=_i(
+            g(c.CONF_POOL_TEMP_MAX_AGE), c.DEFAULT_POOL_TEMP_MAX_AGE
+        ),
     )

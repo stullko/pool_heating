@@ -53,6 +53,7 @@ CONF_POOL_VOLUME_L = "pool_volume_l"
 CONF_HEAT_PUMP_KW = "heat_pump_kw"
 CONF_HEAT_PUMP_THERMAL_KW = "heat_pump_thermal_kw"
 CONF_COP = "cop"
+CONF_POOL_TEMP_MAX_AGE = "pool_temp_max_age_minutes"
 
 # --- Defaults ---------------------------------------------------------------
 DEFAULT_NAME = "Pool heating"
@@ -79,6 +80,9 @@ DEFAULT_RAIN_INTENSITY_THRESHOLD = 0.0
 DEFAULT_HEAT_PUMP_KW = 0.8          # electrical input power (kW)
 DEFAULT_HEAT_PUMP_THERMAL_KW = 5.0  # thermal output power (kW) -> COP ~6.25
 DEFAULT_PRICE_EXPENSIVE_THRESHOLD = 0.30  # EUR/kWh: above this counts as expensive
+# Water temperature moves slowly (tau is tens of hours), so a reading from a
+# sparsely-reporting pool thermometer stays usable far longer than one tick.
+DEFAULT_POOL_TEMP_MAX_AGE = 120     # minutes: fail-safe cutoff for the water reading
 FULL_SUN_LUX = 100000.0             # illuminance treated as full sun (solar proxy)
 
 # --- Price policy -----------------------------------------------------------

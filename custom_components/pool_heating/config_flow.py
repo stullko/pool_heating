@@ -174,6 +174,8 @@ class PoolHeatingOptionsFlow(OptionsFlow):
             [
                 opt_num(c.CONF_TARGET_TEMP, c.DEFAULT_TARGET_TEMP, 15, 35, 0.5, "°C"),
                 opt_num(c.CONF_HYSTERESIS, c.DEFAULT_HYSTERESIS, 0.1, 3, 0.1, "°C"),
+                opt_num(c.CONF_POOL_TEMP_MAX_AGE,
+                        c.DEFAULT_POOL_TEMP_MAX_AGE, 5, 720, 5, "min"),
                 (
                     vol.Optional(c.CONF_NIGHT_START,
                                  default=o.get(c.CONF_NIGHT_START, c.DEFAULT_NIGHT_START)),
