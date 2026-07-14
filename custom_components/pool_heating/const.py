@@ -9,7 +9,7 @@ PLATFORMS = ["sensor", "binary_sensor", "select"]
 
 # --- Bundled frontend card ---------------------------------------------------
 FRONTEND_URL = "/pool_heating_files/pool-heating-card.js"
-FRONTEND_VERSION = "0.3.0"   # bump with manifest version (cache busting)
+FRONTEND_VERSION = "0.3.1"   # bump with manifest version (cache busting)
 DATA_FRONTEND = "pool_heating_frontend_registered"
 
 # --- Config (setup) keys ----------------------------------------------------
